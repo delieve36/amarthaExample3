@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,11 +26,17 @@ public class Approval {
     /** 审批ID **/
     private Long id;
 
-    /** 关联贷款 ID（冗余字段，便于按贷款追溯批准记录） */
+    /** 记录创建时间（服务器时区） */
+    private LocalDateTime gmtCreate;
+
+    /** 记录修改时间（服务器时区） */
+    private LocalDateTime gmtModify;
+
+    /** 关联贷款 ID */
     private Long loanId;
 
     /** 实地验证员的员工 ID */
-    private String validatorEmployeeId;
+    private Long validatorEmployeeId;
 
     /** 实地验证员姓名（非必填） */
     private String validatorEmployeeName;

@@ -8,6 +8,7 @@ import lombok.Setter;
 import lombok.ToString;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 
 /**
@@ -24,16 +25,22 @@ public class Investment {
     /** 投资记录 ID */
     private Long id;
 
+    /** 记录创建时间（服务器时区） */
+    private LocalDateTime gmtCreate;
+
+    /** 记录修改时间（服务器时区） */
+    private LocalDateTime gmtModify;
+
     /** 关联贷款 ID */
     private Long loanId;
 
-    /** 投资者 ID（关联 Investor 实体） */
-    private String investorId;
+    /** 投资者 ID */
+    private Long investorId;
 
     /** 投资者姓名（非必填，冗余便于展示） */
     private String investorName;
 
-    /** 投资金额（以货币最小单位计，如 RMB 分、IDR 仙） */
+    /** 投资金额（货币最小单位，如 1 USD = 100） */
     private BigDecimal amount;
 
     /** 币种（如 CNY、IDR、USD） */

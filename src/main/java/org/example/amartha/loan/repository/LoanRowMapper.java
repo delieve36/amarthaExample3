@@ -16,7 +16,9 @@ public class LoanRowMapper implements RowMapper<Loan> {
     public Loan mapRow(ResultSet rs, int rowNum) throws SQLException {
         Loan loan = new Loan();
         loan.setId(rs.getLong("id"));
-        loan.setBorrowerId(rs.getString("borrower_id"));
+        loan.setGmtCreate(rs.getObject("gmt_create", java.time.LocalDateTime.class));
+        loan.setGmtModify(rs.getObject("gmt_modify", java.time.LocalDateTime.class));
+        loan.setBorrowerId(rs.getLong("borrower_id"));
         loan.setBorrowerName(rs.getString("borrower_name"));
         loan.setPrincipalAmount(rs.getBigDecimal("principal_amount"));
         loan.setInterestRate(rs.getBigDecimal("interest_rate"));

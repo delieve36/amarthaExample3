@@ -5,11 +5,14 @@ import org.example.amartha.loan.model.Disbursement;
 import org.example.amartha.loan.model.Investment;
 import org.example.amartha.loan.model.Loan;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.PreparedStatement;
-import java.util.ArrayList;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -98,83 +101,120 @@ public class LoanRepository {
     @Transactional
     public Loan save(Loan loan) {
         String sql = """
-            INSERT INTO loans (borrower_id, borrower_name, principal_amount,
+            INSERT INTO loans (gmt_create, gmt_modify,
+                               borrower_id, borrower_name, principal_amount,
                                interest_rate, roi, currency, curr_state,
                                init_datetime, agree_letter_send_datetime,
                                funds_received_datetime, agree_letter_url)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
+        LocalDateTime now = LocalDateTime.now();
+        KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbc.update(connection -> {
             PreparedStatement ps = connection.prepareStatement(sql, new String[]{"id"});
-            ps.setString(1, loan.getBorrowerId());
-            ps.setString(2, loan.getBorrowerName());
-            ps.setBigDecimal(3, loan.getPrincipalAmount());
-            ps.setBigDecimal(4, loan.getInterestRate());
-            ps.setBigDecimal(5, loan.getRoi());
-            ps.setString(6, loan.getCurrency());
-            ps.setString(7, loan.getCurrState().name());
-            ps.setObject(8, loan.getInitDatetime());
-            ps.setObject(9, loan.getAgreeLetterSendDatetime());
-            ps.setObject(10, loan.getFundsReceivedDatetime());
-            ps.setString(11, loan.getAgreeLetterUrl());
+            ps.setTimestamp(1, Timestamp.valueOf(now));
+            ps.setTimestamp(2, Timestamp.valueOf(now));
+            ps.setLong(3, loan.getBorrowerId());
+            ps.setString(4, loan.getBorrowerName());
+            ps.setBigDecimal(5, loan.getPrincipalAmount());
+            ps.setBigDecimal(6, loan.getInterestRate());
+            ps.setBigDecimal(7, loan.getRoi());
+            ps.setString(8, loan.getCurrency());
+            ps.setString(9, loan.getCurrState().name());
+            ps.setObject(10, loan.getInitDatetime());
+            ps.setObject(11, loan.getAgreeLetterSendDatetime());
+            ps.setObject(12, loan.getFundsReceivedDatetime());
+            ps.setString(13, loan.getAgreeLetterUrl());
             return ps;
-        });
+        }, keyHolder);
+        Number key = keyHolder.getKey();
+        if (key != null) {
+            loan.setId(key.longValue());
+        }
+        loan.setGmtCreate(now);
+        loan.setGmtModify(now);
         return loan;
     }
 
     @Transactional
     public Loan update(Loan loan) {
         String sql = """
-            UPDATE loans SET borrower_id = ?, borrower_name = ?,
+            UPDATE loans SET gmt_modify = ?,
+                             borrower_id = ?, borrower_name = ?,
                              principal_amount = ?, interest_rate = ?, roi = ?,
                              currency = ?, curr_state = ?,
                              init_datetime = ?, agree_letter_send_datetime = ?,
                              funds_received_datetime = ?, agree_letter_url = ?
             WHERE id = ?
             """;
+        LocalDateTime now = LocalDateTime.now();
         jdbc.update(sql,
+            Timestamp.valueOf(now),
             loan.getBorrowerId(), loan.getBorrowerName(),
             loan.getPrincipalAmount(), loan.getInterestRate(), loan.getRoi(),
             loan.getCurrency(), loan.getCurrState().name(),
             loan.getInitDatetime(), loan.getAgreeLetterSendDatetime(),
             loan.getFundsReceivedDatetime(), loan.getAgreeLetterUrl(),
             loan.getId());
+        loan.setGmtModify(now);
         return loan;
     }
 
     @Transactional
     public void saveInvestment(Long loanId, Investment investment) {
         String sql = """
-            INSERT INTO investments (loan_id, investor_id, investor_name,
-                                     amount, currency, datetime, fund_status)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO investments (gmt_create, gmt_modify,
+                                     loan_id, investor_id, investor_name,
+                                     amount, currency, datetime, fund_received)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
+        LocalDateTime now = LocalDateTime.now();
         jdbc.update(sql,
+            Timestamp.valueOf(now), Timestamp.valueOf(now),
             loanId, investment.getInvestorId(), investment.getInvestorName(),
             investment.getAmount(), investment.getCurrency(),
             investment.getDatetime(), investment.isFundReceived());
+        investment.setGmtCreate(now);
+        investment.setGmtModify(now);
     }
 
     @Transactional
     public void saveApproval(Approval approval, List<String> photoUrls) {
         String insertApproval = """
-            INSERT INTO approvals (loan_id, validator_employee_id,
+            INSERT INTO approvals (gmt_create, gmt_modify,
+                                   loan_id, validator_employee_id,
                                    validator_employee_name, approval_datetime)
-            VALUES (?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?)
             """;
+        LocalDateTime now = LocalDateTime.now();
+        KeyHolder keyHolder = new GeneratedKeyHolder();
         jdbc.update(connection -> {
             PreparedStatement ps = connection.prepareStatement(insertApproval, new String[]{"id"});
-            ps.setLong(1, approval.getLoanId());
-            ps.setString(2, approval.getValidatorEmployeeId());
-            ps.setString(3, approval.getValidatorEmployeeName());
-            ps.setObject(4, approval.getApprovalDatetime());
+            ps.setTimestamp(1, Timestamp.valueOf(now));
+            ps.setTimestamp(2, Timestamp.valueOf(now));
+            ps.setLong(3, approval.getLoanId());
+            ps.setLong(4, approval.getValidatorEmployeeId());
+            ps.setString(5, approval.getValidatorEmployeeName());
+            ps.setObject(6, approval.getApprovalDatetime());
             return ps;
-        });
+        }, keyHolder);
+
+        Number approvalKey = keyHolder.getKey();
+        if (approvalKey == null) {
+            throw new IllegalStateException("Failed to retrieve generated approval ID");
+        }
+        Long approvalId = approvalKey.longValue();
+        approval.setId(approvalId);
+        approval.setGmtCreate(now);
+        approval.setGmtModify(now);
 
         if (photoUrls != null && !photoUrls.isEmpty()) {
-            String insertPhoto = "INSERT INTO approval_photos (approval_id, photo_url) VALUES (?, ?)";
+            String insertPhoto = """
+                INSERT INTO approval_photos (gmt_create, gmt_modify, approval_id, photo_url)
+                VALUES (?, ?, ?, ?)
+                """;
             for (String url : photoUrls) {
-                jdbc.update(insertPhoto, approval.getLoanId(), url);
+                jdbc.update(insertPhoto, Timestamp.valueOf(now), Timestamp.valueOf(now), approvalId, url);
             }
         }
     }
@@ -182,16 +222,21 @@ public class LoanRepository {
     @Transactional
     public void saveDisbursement(Disbursement disbursement) {
         String sql = """
-            INSERT INTO disbursements (loan_id, signed_agreement_url,
+            INSERT INTO disbursements (gmt_create, gmt_modify,
+                                       loan_id, signed_agreement_url,
                                        field_officer_employee_id,
                                        field_officer_employee_name,
-                                       disbursement_datetime, status)
-            VALUES (?, ?, ?, ?, ?, ?)
+                                       disbursement_datetime, success)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """;
+        LocalDateTime now = LocalDateTime.now();
         jdbc.update(sql,
+            Timestamp.valueOf(now), Timestamp.valueOf(now),
             disbursement.getLoanId(), disbursement.getSignedAgreementUrl(),
             disbursement.getFieldOfficerEmployeeId(),
             disbursement.getFieldOfficerEmployeeName(),
             disbursement.getDisbursementDatetime(), disbursement.isSuccess());
+        disbursement.setGmtCreate(now);
+        disbursement.setGmtModify(now);
     }
 }

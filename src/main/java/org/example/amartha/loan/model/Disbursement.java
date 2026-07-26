@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 
 /**
@@ -23,6 +24,12 @@ public class Disbursement {
     /** 放款记录 ID */
     private Long id;
 
+    /** 记录创建时间（服务器时区） */
+    private LocalDateTime gmtCreate;
+
+    /** 记录修改时间（服务器时区） */
+    private LocalDateTime gmtModify;
+
     /** 关联贷款 ID */
     private Long loanId;
 
@@ -30,7 +37,7 @@ public class Disbursement {
     private String signedAgreementUrl;
 
     /** 负责交付资金的现场员工 ID */
-    private String fieldOfficerEmployeeId;
+    private Long fieldOfficerEmployeeId;
 
     /** 现场员工姓名（非必填） */
     private String fieldOfficerEmployeeName;
