@@ -3,52 +3,33 @@ package org.example.amartha.loan.state;
 import org.example.amartha.loan.model.*;
 
 /**
- * State Pattern — each implementation handles the allowed operations
- * for a single loan lifecycle stage. All implementations are stateless
- * singletons (immutable, thread-safe).
+ * State machine contract — every loan state handler must implement
+ * these three transition operations.
  *
- * <p>INIT state does not have a handler — it is a pure data label.
- * Transition INIT → PROPOSED is done directly via
- * {@code loan.setCurrState(PROPOSED)}.</p>
+ * <h3>Adding a new operation</h3>
+ * <ol>
+ *   <li>Add the method signature here.</li>
+ *   <li>Add a default {@code throw} implementation in {@link AbstractLoanState}.</li>
+ *   <li>Override it in the concrete states that support it.</li>
+ * </ol>
+ *
+ * <h3>Adding a new state</h3>
+ * <ol>
+ *   <li>Create a class extending {@link AbstractLoanState}.</li>
+ *   <li>Override only the methods that are legal for that state.</li>
+ *   <li>Register it in {@link #forState(LoanStateEnum)}.</li>
+ * </ol>
+ *
+ * @see AbstractLoanState
  */
 public interface LoanStateHandler {
 
-    /**
-     * Transition from current state → APPROVED.
-     *
-     * @param loan     the loan being operated on
-     * @param approval approval info (photo proof, employee ID, datetime)
-     * @return next state after the transition
-     * @throws IllegalStateException    if the current state does not allow approval
-     * @throws IllegalArgumentException if required approval fields are missing
-     */
     LoanStateEnum approve(Loan loan, Approval approval);
 
-    /**
-     * Record an investment — may or may not advance the state.
-     *
-     * @param loan       the loan being invested in
-     * @param investment investment record (investor, amount, currency, etc.)
-     * @return next state (APPROVED if still underfunded, INVESTED if fully funded)
-     * @throws IllegalStateException    if the current state does not accept investments
-     * @throws IllegalArgumentException if investment amount is invalid or exceeds remaining principal
-     */
     LoanStateEnum invest(Loan loan, Investment investment);
 
-    /**
-     * Transition from INVESTED → DISBURSED.
-     *
-     * @param loan         the loan being disbursed
-     * @param disbursement disbursement info (agreement, officer, datetime)
-     * @return next state after the transition
-     * @throws IllegalStateException    if the current state does not allow disbursement
-     * @throws IllegalArgumentException if required disbursement fields are missing
-     */
     LoanStateEnum disburse(Loan loan, Disbursement disbursement);
 
-    /**
-     * Dispatch to the correct handler for the given state.
-     */
     static LoanStateHandler forState(LoanStateEnum state) {
         return switch (state) {
             case PROPOSED  -> ProposedState.INSTANCE;

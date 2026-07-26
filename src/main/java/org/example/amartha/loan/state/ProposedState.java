@@ -3,13 +3,18 @@ package org.example.amartha.loan.state;
 import org.example.amartha.loan.model.*;
 
 /**
- * PROPOSED — initial state. Only {@code approve} is legal.
+ * PROPOSED — ready for approval.
+ *
+ * <p>Legal transition: {@code approve} → APPROVED.</p>
  */
-public final class ProposedState implements LoanStateHandler {
+public final class ProposedState extends AbstractLoanState {
 
     public static final ProposedState INSTANCE = new ProposedState();
 
     private ProposedState() {}
+
+    @Override
+    protected String stateName() { return "PROPOSED"; }
 
     @Override
     public LoanStateEnum approve(Loan loan, Approval approval) {
@@ -30,17 +35,5 @@ public final class ProposedState implements LoanStateHandler {
         loan.setApproval(approval);
 
         return LoanStateEnum.APPROVED;
-    }
-
-    @Override
-    public LoanStateEnum invest(Loan loan, Investment investment) {
-        throw new IllegalStateException(
-            "Cannot invest in a PROPOSED loan (id=" + loan.getId() + "). It must be approved first.");
-    }
-
-    @Override
-    public LoanStateEnum disburse(Loan loan, Disbursement disbursement) {
-        throw new IllegalStateException(
-            "Cannot disburse a PROPOSED loan (id=" + loan.getId() + "). It must be approved and invested first.");
     }
 }

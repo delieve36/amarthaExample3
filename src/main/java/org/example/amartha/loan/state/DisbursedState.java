@@ -1,31 +1,15 @@
 package org.example.amartha.loan.state;
 
-import org.example.amartha.loan.model.*;
-
 /**
- * DISBURSED — terminal state. All operations are illegal.
+ * DISBURSED — terminal state. No further transitions are possible.
+ * All operations inherit the default rejection from {@link AbstractLoanState}.
  */
-public final class DisbursedState implements LoanStateHandler {
+public final class DisbursedState extends AbstractLoanState {
 
     public static final DisbursedState INSTANCE = new DisbursedState();
 
     private DisbursedState() {}
 
     @Override
-    public LoanStateEnum approve(Loan loan, Approval approval) {
-        // TODO: illegal state — throw IllegalStateException
-        throw new UnsupportedOperationException("TODO");
-    }
-
-    @Override
-    public LoanStateEnum invest(Loan loan, Investment investment) {
-        // TODO: illegal state — throw IllegalStateException
-        throw new UnsupportedOperationException("TODO");
-    }
-
-    @Override
-    public LoanStateEnum disburse(Loan loan, Disbursement disbursement) {
-        // TODO: illegal state — throw IllegalStateException
-        throw new UnsupportedOperationException("TODO");
-    }
+    protected String stateName() { return "DISBURSED"; }
 }

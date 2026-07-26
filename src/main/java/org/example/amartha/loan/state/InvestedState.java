@@ -3,31 +3,37 @@ package org.example.amartha.loan.state;
 import org.example.amartha.loan.model.*;
 
 /**
- * INVESTED — fully funded. Only {@code disburse} is legal.
+ * INVESTED — fully funded, ready to disburse.
+ *
+ * <p>Legal transition: {@code disburse} → DISBURSED.</p>
  */
-public final class InvestedState implements LoanStateHandler {
+public final class InvestedState extends AbstractLoanState {
 
     public static final InvestedState INSTANCE = new InvestedState();
 
     private InvestedState() {}
 
     @Override
-    public LoanStateEnum approve(Loan loan, Approval approval) {
-        // TODO: illegal state — throw IllegalStateException
-        throw new UnsupportedOperationException("TODO");
-    }
-
-    @Override
-    public LoanStateEnum invest(Loan loan, Investment investment) {
-        // TODO: illegal state — throw IllegalStateException
-        throw new UnsupportedOperationException("TODO");
-    }
+    protected String stateName() { return "INVESTED"; }
 
     @Override
     public LoanStateEnum disburse(Loan loan, Disbursement disbursement) {
-        // TODO: validate disbursement fields (agreement URL, officer ID, datetime)
-        //       loan.setDisbursement(disbursement);
-        //       return DISBURSED
-        throw new UnsupportedOperationException("TODO");
+        if (disbursement == null) {
+            throw new IllegalArgumentException("Disbursement must not be null");
+        }
+        if (disbursement.getSignedAgreementUrl() == null || disbursement.getSignedAgreementUrl().isBlank()) {
+            throw new IllegalArgumentException("Disbursement must include signedAgreementUrl");
+        }
+        if (disbursement.getFieldOfficerEmployeeId() == null) {
+            throw new IllegalArgumentException("Disbursement must include fieldOfficerEmployeeId");
+        }
+        if (disbursement.getDisbursementDatetime() == null) {
+            throw new IllegalArgumentException("Disbursement must include disbursementDatetime");
+        }
+
+        disbursement.setLoanId(loan.getId());
+        loan.setDisbursement(disbursement);
+
+        return LoanStateEnum.DISBURSED;
     }
 }
