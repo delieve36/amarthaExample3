@@ -6,6 +6,8 @@ import org.example.amartha.loan.state.LoanStateHandler;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+
 /**
  * Loan lifecycle orchestrator — delegates state transitions to
  * {@link LoanStateHandler} implementations and persists via
@@ -19,6 +21,17 @@ public class LoanService {
 
     public LoanService(LoanRepository loanRepository) {
         this.loanRepository = loanRepository;
+    }
+
+    // ========================================================================
+    // Lifecycle
+    // ========================================================================
+
+    public Loan createLoan(Long borrowerId, BigDecimal principalAmount,
+                           BigDecimal interestRate, BigDecimal roi, String currency) {
+        Loan loan = new Loan(borrowerId, principalAmount, interestRate, roi, currency);
+        loan.setInitDatetime(java.time.OffsetDateTime.now());
+        return loanRepository.save(loan);
     }
 
     // ========================================================================

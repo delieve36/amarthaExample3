@@ -13,21 +13,34 @@ public final class ProposedState implements LoanStateHandler {
 
     @Override
     public LoanStateEnum approve(Loan loan, Approval approval) {
-        // TODO: validate approval fields (photo, employee ID, datetime)
-        //       loan.setApproval(approval);
-        //       return APPROVED
-        throw new UnsupportedOperationException("TODO");
+        if (approval == null) {
+            throw new IllegalArgumentException("Approval must not be null");
+        }
+        if (approval.getValidatorEmployeeId() == null) {
+            throw new IllegalArgumentException("Approval must include validatorEmployeeId");
+        }
+        if (approval.getApprovalDatetime() == null) {
+            throw new IllegalArgumentException("Approval must include approvalDatetime");
+        }
+        if (approval.getValidatorPhotoUrls() == null || approval.getValidatorPhotoUrls().isEmpty()) {
+            throw new IllegalArgumentException("Approval must include at least one validator photo URL");
+        }
+
+        approval.setLoanId(loan.getId());
+        loan.setApproval(approval);
+
+        return LoanStateEnum.APPROVED;
     }
 
     @Override
     public LoanStateEnum invest(Loan loan, Investment investment) {
-        // TODO: illegal state — throw IllegalStateException
-        throw new UnsupportedOperationException("TODO");
+        throw new IllegalStateException(
+            "Cannot invest in a PROPOSED loan (id=" + loan.getId() + "). It must be approved first.");
     }
 
     @Override
     public LoanStateEnum disburse(Loan loan, Disbursement disbursement) {
-        // TODO: illegal state — throw IllegalStateException
-        throw new UnsupportedOperationException("TODO");
+        throw new IllegalStateException(
+            "Cannot disburse a PROPOSED loan (id=" + loan.getId() + "). It must be approved and invested first.");
     }
 }

@@ -6,6 +6,10 @@ import org.example.amartha.loan.model.*;
  * State Pattern — each implementation handles the allowed operations
  * for a single loan lifecycle stage. All implementations are stateless
  * singletons (immutable, thread-safe).
+ *
+ * <p>INIT state does not have a handler — it is a pure data label.
+ * Transition INIT → PROPOSED is done directly via
+ * {@code loan.setCurrState(PROPOSED)}.</p>
  */
 public interface LoanStateHandler {
 
