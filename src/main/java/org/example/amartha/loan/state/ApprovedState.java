@@ -1,5 +1,6 @@
 package org.example.amartha.loan.state;
 
+import lombok.extern.slf4j.Slf4j;
 import org.example.amartha.loan.model.*;
 
 import java.math.BigDecimal;
@@ -9,6 +10,7 @@ import java.math.BigDecimal;
  *
  * <p>Legal transition: {@code invest} → INVESTED (when fully funded).</p>
  */
+@Slf4j
 public final class ApprovedState extends AbstractLoanState {
 
     public static final ApprovedState INSTANCE = new ApprovedState();
@@ -36,6 +38,8 @@ public final class ApprovedState extends AbstractLoanState {
         BigDecimal newTotal = totalBefore.add(investment.getAmount());
 
         if (newTotal.compareTo(loan.getPrincipalAmount()) > 0) {
+            log.error("Investment exceeds principal: loan={} invested={} new={} principal={}",
+                loan.getId(), totalBefore, investment.getAmount(), loan.getPrincipalAmount());
             throw new IllegalArgumentException(
                 "Total investment cannot exceed principal. " +
                 "Invested: " + totalBefore + ", new: " + investment.getAmount() +
@@ -46,8 +50,14 @@ public final class ApprovedState extends AbstractLoanState {
         loan.getInvestments().add(investment);
 
         if (newTotal.compareTo(loan.getPrincipalAmount()) == 0) {
+            log.info("Loan {} fully funded by investor {} ({} total={}) — {} → INVESTED",
+                loan.getId(), investment.getInvestorId(), investment.getAmount(),
+                newTotal, stateName());
             return LoanStateEnum.INVESTED;
         }
+        log.info("Investment recorded: loan={} investor={} amount={} total={}/{}",
+            loan.getId(), investment.getInvestorId(), investment.getAmount(),
+            newTotal, loan.getPrincipalAmount());
         return LoanStateEnum.APPROVED;
     }
 }

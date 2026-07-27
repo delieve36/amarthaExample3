@@ -1,5 +1,6 @@
 package org.example.amartha.loan.state;
 
+import lombok.extern.slf4j.Slf4j;
 import org.example.amartha.loan.model.*;
 
 /**
@@ -7,6 +8,7 @@ import org.example.amartha.loan.model.*;
  *
  * <p>Legal transition: {@code approve} → APPROVED.</p>
  */
+@Slf4j
 public final class ProposedState extends AbstractLoanState {
 
     public static final ProposedState INSTANCE = new ProposedState();
@@ -34,6 +36,8 @@ public final class ProposedState extends AbstractLoanState {
         approval.setLoanId(loan.getId());
         loan.setApproval(approval);
 
+        log.info("Loan {} approved by employee {} — {} → APPROVED",
+            loan.getId(), approval.getValidatorEmployeeId(), stateName());
         return LoanStateEnum.APPROVED;
     }
 }

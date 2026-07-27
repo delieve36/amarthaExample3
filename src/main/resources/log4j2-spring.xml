@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN" monitorInterval="30">
+
+    <Properties>
+        <Property name="LOG_PATTERN">%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n</Property>
+        <Property name="LOG_DIR">logs</Property>
+    </Properties>
+
+    <Appenders>
+
+        <!-- Console (dev) -->
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="${LOG_PATTERN}"/>
+        </Console>
+
+        <!-- Application log: INFO+ for org.example.amartha, daily rolling, 10 files max -->
+        <RollingFile name="AppLog"
+                     fileName="${LOG_DIR}/app.log"
+                     filePattern="${LOG_DIR}/app-%d{yyyy-MM-dd}.log.gz">
+            <PatternLayout pattern="${LOG_PATTERN}"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+                <SizeBasedTriggeringPolicy size="10 MB"/>
+            </Policies>
+            <DefaultRolloverStrategy max="10"/>
+        </RollingFile>
+
+        <!-- Error log: WARN+ for all, daily rolling -->
+        <RollingFile name="ErrorLog"
+                     fileName="${LOG_DIR}/error.log"
+                     filePattern="${LOG_DIR}/error-%d{yyyy-MM-dd}.log.gz">
+            <PatternLayout pattern="${LOG_PATTERN}"/>
+            <ThresholdFilter level="WARN" onMatch="ACCEPT" onMismatch="DENY"/>
+            <Policies>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+            </Policies>
+            <DefaultRolloverStrategy max="10"/>
+        </RollingFile>
+
+    </Appenders>
+
+    <Loggers>
+
+        <!-- Application code: INFO → app log, WARN+ → error log also -->
+        <Logger name="org.example.amartha" level="INFO" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="AppLog"/>
+            <AppenderRef ref="ErrorLog"/>
+        </Logger>
+
+        <!-- Spring framework: WARN (noisy at INFO) -->
+        <Logger name="org.springframework" level="WARN" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="AppLog"/>
+            <AppenderRef ref="ErrorLog"/>
+        </Logger>
+
+        <!-- HikariCP / JDBC: INFO for connection pool events -->
+        <Logger name="com.zaxxer.hikari" level="INFO" additivity="false">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="AppLog"/>
+        </Logger>
+
+        <!-- Root: WARN (catch-all for third-party libs) -->
+        <Root level="WARN">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="AppLog"/>
+            <AppenderRef ref="ErrorLog"/>
+        </Root>
+
+    </Loggers>
+
+</Configuration>

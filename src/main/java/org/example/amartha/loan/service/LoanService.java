@@ -1,5 +1,6 @@
 package org.example.amartha.loan.service;
 
+import lombok.extern.slf4j.Slf4j;
 import org.example.amartha.loan.model.*;
 import org.example.amartha.loan.repository.LoanRepository;
 import org.example.amartha.loan.state.LoanStateHandler;
@@ -13,6 +14,7 @@ import java.math.BigDecimal;
  * {@link LoanStateHandler} implementations and persists via
  * {@link LoanRepository}.
  */
+@Slf4j
 @Service
 @Transactional
 public class LoanService {
@@ -31,7 +33,10 @@ public class LoanService {
                            BigDecimal interestRate, BigDecimal roi, String currency) {
         Loan loan = new Loan(borrowerId, principalAmount, interestRate, roi, currency);
         loan.setInitDatetime(java.time.OffsetDateTime.now());
-        return loanRepository.save(loan);
+        loan = loanRepository.save(loan);
+        log.info("Loan created: id={} borrower={} amount={} {} state={}",
+            loan.getId(), borrowerId, principalAmount, currency, loan.getCurrState());
+        return loan;
     }
 
     // ========================================================================
@@ -46,8 +51,10 @@ public class LoanService {
         loan.setCurrState(handler.approve(loan, approval));
 
         loanRepository.saveApproval(approval, approval.getValidatorPhotoUrls());
+        loan = loanRepository.update(loan);
 
-        return loanRepository.update(loan);
+        log.info("Loan {} approved — persisted approval record", loanId);
+        return loan;
     }
 
     public Loan investLoan(Long loanId, Investment investment) {
@@ -61,7 +68,10 @@ public class LoanService {
 
         // TODO: if transitioned to INVESTED, generate agreement letter & notify
 
-        return loanRepository.update(loan);
+        loan = loanRepository.update(loan);
+        log.info("Investment persisted: loan={} investor={} amount={}",
+            loanId, investment.getInvestorId(), investment.getAmount());
+        return loan;
     }
 
     public Loan disburseLoan(Long loanId, Disbursement disbursement) {
@@ -72,7 +82,9 @@ public class LoanService {
         loan.setCurrState(handler.disburse(loan, disbursement));
 
         loanRepository.saveDisbursement(disbursement);
+        loan = loanRepository.update(loan);
 
-        return loanRepository.update(loan);
+        log.info("Loan {} disbursed — persisted disbursement record", loanId);
+        return loan;
     }
 }

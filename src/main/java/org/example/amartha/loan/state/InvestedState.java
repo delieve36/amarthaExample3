@@ -1,5 +1,6 @@
 package org.example.amartha.loan.state;
 
+import lombok.extern.slf4j.Slf4j;
 import org.example.amartha.loan.model.*;
 
 /**
@@ -7,6 +8,7 @@ import org.example.amartha.loan.model.*;
  *
  * <p>Legal transition: {@code disburse} → DISBURSED.</p>
  */
+@Slf4j
 public final class InvestedState extends AbstractLoanState {
 
     public static final InvestedState INSTANCE = new InvestedState();
@@ -34,6 +36,8 @@ public final class InvestedState extends AbstractLoanState {
         disbursement.setLoanId(loan.getId());
         loan.setDisbursement(disbursement);
 
+        log.info("Loan {} disbursed by officer {} — {} → DISBURSED",
+            loan.getId(), disbursement.getFieldOfficerEmployeeId(), stateName());
         return LoanStateEnum.DISBURSED;
     }
 }

@@ -1,5 +1,6 @@
 package org.example.amartha.loan.state;
 
+import lombok.extern.slf4j.Slf4j;
 import org.example.amartha.loan.model.*;
 
 /**
@@ -13,6 +14,7 @@ import org.example.amartha.loan.model.*;
  *   <li>Override the operation(s) they actually permit.</li>
  * </ol>
  */
+@Slf4j
 public abstract class AbstractLoanState implements LoanStateHandler {
 
     @Override
@@ -31,6 +33,7 @@ public abstract class AbstractLoanState implements LoanStateHandler {
     }
 
     protected IllegalStateException illegal(String action, Long loanId) {
+        log.warn("Illegal transition attempted: {} on {} loan {}", action, stateName(), loanId);
         return new IllegalStateException(
             "Cannot " + action + " a loan in " + stateName() + " state (id=" + loanId + ")");
     }
