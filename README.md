@@ -1,222 +1,279 @@
-# Loan Service — 题目3 设计方案
+# Loan Engine — Amartha Code Challenge (Problem 3)
 
-## 概述
-
-实现一个贷款引擎的 RESTful API，管理贷款从创建到发放的完整生命周期。
-贷款状态按规则单向流转：`proposed → approved → invested → disbursed`。
-贷款的核心属性为：`borrowerId`（借款人 ID，字符串）、`principalAmount`（本金金额）、
-`rate`（利率，决定借款人需支付的总利息）、
-`roi`（投资回报率，决定投资者获得的总利润）、
-`agreementLetterUrl`（放款后生成的协议信链接）
----
-
-## 领域模型
-
-### Loan（贷款）
-
-| 字段                 | 类型               | 必填 | 说明                                 |
-|----------------------|--------------------|------|--------------------------------------|
-| `id`                 | `Long`             | —    | 贷款唯一标识（自增主键）             |
-| `borrowerId`         | `String`           | Y    | 借款人 ID                            |
-| `principalAmount`    | `BigDecimal`       | Y    | 本金金额（must > 0 取货币最小单位）  |
-| `rate`               | `BigDecimal`       | Y    | 利率（定义借款人需支付的总利息）     |
-| `roi`                | `BigDecimal`       | Y    | 投资回报率（定义投资者获得的总利润） |
-| `notes`              | `String`           | N    | 贷款备注                             |
-| `state`              | `LoanStateEnum`    | —    | 当前状态枚举                         |
-| `approval`           | `Approval`         | —    | 批准信息（可为 null）                |
-| `investments`        | `List<Investment>` | —    | 投资列表                             |
-| `disbursement`       | `Disbursement`     | —    | 放款信息（可为 null）                |
-| `agreementLetterUrl` | `String`           | —    | 生成的协议信链接                     |
-
-### LoanStateEnum（枚举）
-
-状态定义：`PROPOSED → APPROVED → INVESTED → DISBURSED`
-
-### Approval（批准信息）
-
-| 字段                       | 类型        | 必填 | 说明                               |
-|----------------------------|-------------|------|------------------------------------|
-| `fieldValidatorPhotoUrl`   | `String`    | Y    | 实地验证员访问借款人的图片证明 URL |
-| `fieldValidatorEmployeeId` | `String`    | Y    | 实地验证员的员工 ID                |
-| `approvalDate`             | `LocalDate` | Y    | 批准日期                           |
-
-### Investment（投资）
-
-| 字段         | 类型         | 必填 | 说明                 |
-|--------------|--------------|------|----------------------|
-| `investorId` | `String`     | Y    | 投资者 ID            |
-| `amount`     | `BigDecimal` | Y    | 投资金额（must > 0） |
-
-### Disbursement（放款信息）
-
-| 字段                     | 类型        | 必填 | 说明                  |
-|--------------------------|-------------|------|-----------------------|
-| `signedAgreementUrl`     | `String`    | Y    | 借款人签署的协议信URL |
-| `fieldOfficerEmployeeId` | `String`    | Y    | 现场员工 ID           |
-| `disbursementDate`       | `LocalDate` | Y    | 放款日期              |
+REST API for a loan lifecycle engine with strict uni-directional state machine:
+`PROPOSED → APPROVED → INVESTED → DISBURSED`.
 
 ---
 
-## 状态机设计（State Pattern）
-
-采用状态模式实现状态流转，每个状态对应一个独立的处理器类。
+## Architecture
 
 ```
-┌─────────────┐  approve()  ┌─────────────┐  invest()  ┌─────────────┐  disburse()  ┌──────────────┐
-│ProposedState│ ──────────▶ │ApprovedState│ ──────────▶│InvestedState│ ────────────▶│DisbursedState│
-│             │             │             │            │             │              │              │
-│ 仅允许审批  │             │ 仅允许投资  │            │ 仅允许放款  │              │ 所有操作拒绝 │
-└─────────────┘             └─────────────┘            └─────────────┘              └──────────────┘
+Controller (@Valid DTOs)
+    │
+LoanService (lifecycle orchestrator)
+    │              │
+    ├─ LoanStateHandler    ← State Pattern dispatch
+    │   └─ AbstractLoanState (default: throw on illegal transitions)
+    │       ├─ ProposedState   → approve  → APPROVED
+    │       ├─ ApprovedState   → invest   → INVESTED
+    │       ├─ InvestedState   → disburse → DISBURSED
+    │       └─ DisbursedState  → terminal
+    │
+    └─ LoanRepository     ← JdbcTemplate + handwritten SQL
+            │
+            └─ H2 (TCP server, MySQL compat mode)
 ```
-
-### 状态转换规则
-
-- **PROPOSED → APPROVED**：必须提供批准信息（照片证明、员工ID、日期）；不可回退。
-- **APPROVED → INVESTED**：总投资额必须等于贷款本金；可有多位投资者；总投资额不可超过本金；投资完成后发送邮件通知（含协议信链接）。
-- **INVESTED → DISBURSED**：必须提供借款人签署的协议信、现场员工ID、放款日期。
-
-### 类结构
-
-```
-state/
-├── LoanStateHandler.java      # 状态接口 — 定义 approve/invest/disburse 方法
-├── ProposedState.java         # 初始状态 — 仅 approve() 允许
-├── ApprovedState.java         # 已批准  — 仅 invest() 允许（可部分投资）
-├── InvestedState.java         # 已满投  — 仅 disburse() 允许
-└── DisbursedState.java        # 已放款  — 所有操作拒绝（终止态）
-```
-
-Loan 实体通过 `LoanStateHandler.forState(state)` 获取当前状态处理器并委托调用。
 
 ---
 
-## 参数校验设计
+## Domain Model
 
-采用 **两层校验**：
+### Loan
 
-| 层级   | 位置             | 机制                                              | 作用                                               |
-|--------|------------------|---------------------------------------------------|----------------------------------------------------|
-| API 层 | Controller + DTO | `@Valid` + `@NotBlank` / `@NotNull` / `@Positive` | 请求到达 Service 前快速失败                        |
-| 领域层 | State Handler    | 显式 if/throw                                     | 确保绕过 Controller 的调用（如内部调用）也经过校验 |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | `Long` | — | Auto-increment PK |
+| `gmtCreate` / `gmtModify` | `LocalDateTime` | — | Record timestamps |
+| `borrowerId` | `Long` | Y | Borrower identifier |
+| `borrowerName` | `String` | N | Borrower display name |
+| `principalAmount` | `BigDecimal` | Y | Smallest currency unit (e.g. USD cents) |
+| `interestRate` | `BigDecimal` | Y | Annual rate (0–100%) |
+| `roi` | `BigDecimal` | Y | Return on investment (0–100%) |
+| `currency` | `String` | Y | ISO 4217 (3-letter) |
+| `currState` | `LoanStateEnum` | — | Current state, managed by state machine |
+| `initDatetime` | `OffsetDateTime` | — | Loan creation time |
+| `agreeLetterSendDatetime` | `OffsetDateTime` | — | When agreement letter was sent |
+| `fundsReceivedDatetime` | `OffsetDateTime` | — | When all investments are confirmed RECEIVED |
+| `agreeLetterUrl` | `String` | — | Generated agreement letter link |
+| `approval` | `Approval` | — | Approval record |
+| `investments` | `List<Investment>` | — | Investment records |
+| `disbursement` | `Disbursement` | — | Disbursement record |
 
-### 必填 vs 非必填字段
+### LoanStateEnum
 
-| API                                | 必填字段                                                             | 非必填字段 |
-|------------------------------------|----------------------------------------------------------------------|------------|
-| `POST /api/loans`                  | `borrowerId`, `principal`, `rate`, `roi`                             | `notes`    |
-| `PATCH /api/loans/{id}/approve`    | `fieldValidatorPhotoUrl`, `fieldValidatorEmployeeId`, `approvalDate` | —          |
-| `POST /api/loans/{id}/investments` | `investorId`, `amount`                                               | —          |
-| `PATCH /api/loans/{id}/disburse`   | `signedAgreementUrl`, `fieldOfficerEmployeeId`, `disbursementDate`   | —          |
+`PROPOSED → APPROVED → INVESTED → DISBURSED` (uni-directional).
+
+### Approval
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `loanId` | `Long` | — | FK back to loan |
+| `validatorEmployeeId` | `Long` | Y | Field validator employee ID |
+| `validatorEmployeeName` | `String` | N | Employee display name |
+| `approvalDatetime` | `OffsetDateTime` | Y | Approval timestamp |
+| `validatorPhotoUrls` | `List<String>` | Y | ≥ 1 photo proof URLs |
+
+### Investment
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `loanId` | `Long` | — | FK back to loan |
+| `investorId` | `Long` | Y | Investor identifier |
+| `investorName` | `String` | N | Investor display name |
+| `amount` | `BigDecimal` | Y | Smallest currency unit, must be > 0 |
+| `currency` | `String` | Y | ISO 4217 |
+| `datetime` | `OffsetDateTime` | Y | Investment timestamp |
+| `fundStatus` | `FundStatus` | — | `PENDING` or `RECEIVED` |
+
+### Disbursement
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `loanId` | `Long` | — | FK back to loan |
+| `signedAgreementUrl` | `String` | Y | Signed PDF/JPEG URL |
+| `fieldOfficerEmployeeId` | `Long` | Y | Disbursing officer ID |
+| `fieldOfficerEmployeeName` | `String` | N | Officer display name |
+| `disbursementDatetime` | `OffsetDateTime` | Y | Disbursement timestamp (future = scheduled) |
+| `disbursed` | `boolean` | — | Always `TRUE` once inserted |
+
+### Investor (standalone entity, not yet wired)
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `investorId` | `String` | Y | Unique identifier |
+| `name` | `String` | Y | Full name |
+| `emailUrl` | `String` | N | Email for notifications |
+| `registerDate` | `LocalDate` | N | Registration date |
 
 ---
 
-## RESTful API 设计
+## State Machine (State Pattern)
 
-| 方法    | 路径                          | 说明                                                              |
-|:--------|:------------------------------|:------------------------------------------------------------------|
-| `POST`  | `/api/loans`                  | 创建贷款（初始状态 PROPOSED）                                     |
-| `GET`   | `/api/loans/{id}`             | 查询贷款详情                                                      |
-| `PATCH` | `/api/loans/{id}/approve`     | 批准贷款（PROPOSED → APPROVED）                                   |
-| `POST`  | `/api/loans/{id}/investments` | 投资者投资（累计至 APPROVED 的贷款，达到本金后自动变为 INVESTED） |
-| `PATCH` | `/api/loans/{id}/disburse`    | 放款（INVESTED → DISBURSED）                                      |
+### Design
 
-### 请求/响应示例
+- **`LoanStateHandler`** — interface: `approve()`, `invest()`, `disburse()`
+- **`AbstractLoanState`** — base class: all methods default to `IllegalStateException`
+- Concrete states override only the method they permit:
 
-**创建贷款（含非必填 notes）：**
+| State | Allowed Operation | → Next State |
+|-------|------------------|--------------|
+| `ProposedState` | `approve()` | `APPROVED` |
+| `ApprovedState` | `invest()` | `INVESTED` (when total = principal) |
+| `InvestedState` | `disburse()` | `DISBURSED` |
+| `DisbursedState` | (none) | terminal |
 
-`POST /api/loans`
+### Extensibility
 
+- **Add a new operation**: add to `LoanStateHandler` → default throw in `AbstractLoanState` → override in states that support it.
+- **Add a new state**: extend `AbstractLoanState`, override `stateName()` + the operation(s) it supports, register in `forState()`.
+
+---
+
+## REST API
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/loans` | Create loan → 201 (PROPOSED) |
+| `GET` | `/api/loans/{id}` | Get loan details → 200 |
+| `PATCH` | `/api/loans/{id}/approve` | Approve → 200 (→ APPROVED) |
+| `POST` | `/api/loans/{id}/investments` | Invest → 200 (→ INVESTED when fully funded) |
+| `PATCH` | `/api/loans/{id}/investments/{iid}/receive` | Confirm funds → 204 |
+| `PATCH` | `/api/loans/{id}/disburse` | Disburse → 200 (→ DISBURSED) |
+
+### Request Examples
+
+**Create loan:**
+```
+POST /api/loans
+```
 ```json
 {
-  "borrowerId": "BORROWER001",
-  "principal": 5000000,
-  "rate": 10,
-  "roi": 8,
-  "notes": "用于创业的小额贷款"
+  "borrowerId": 1001,
+  "borrowerName": "Zhang Wei",
+  "principalAmount": 500000,
+  "interestRate": 10.00,
+  "roi": 8.00,
+  "currency": "USD"
 }
 ```
 
-**批准贷款：**
-
-`PATCH /api/loans/{id}/approve`
-
+**Approve:**
+```
+PATCH /api/loans/{id}/approve
+```
 ```json
 {
-  "fieldValidatorPhotoUrl": "https://storage.example.com/photo.jpg",
-  "fieldValidatorEmployeeId": "EMP001",
-  "approvalDate": "2026-07-25"
+  "validatorEmployeeId": 2001,
+  "validatorEmployeeName": "Chen Jie",
+  "approvalDatetime": "2026-07-27T12:00:00+08:00",
+  "validatorPhotoUrls": ["https://storage.example.com/photo.jpg"]
 }
 ```
 
-**投资：**
-
-`POST /api/loans/{id}/investments`
-
+**Invest (with optional fundStatus):**
+```
+POST /api/loans/{id}/investments
+```
 ```json
 {
-  "investorId": "INV001",
-  "amount": 3000000
+  "investorId": 3001,
+  "investorName": "Alice",
+  "amount": 300000,
+  "currency": "USD",
+  "datetime": "2026-07-27T12:00:00+08:00",
+  "fundStatus": "RECEIVED"
 }
 ```
 
-**放款：**
+**Confirm funds (for PENDING investments):**
+```
+PATCH /api/loans/{id}/investments/{investmentId}/receive
+```
 
-`PATCH /api/loans/{id}/disburse`
-
+**Disburse (future datetime → Kafka-style log):**
+```
+PATCH /api/loans/{id}/disburse
+```
 ```json
 {
   "signedAgreementUrl": "https://storage.example.com/agreement.pdf",
-  "fieldOfficerEmployeeId": "EMP002",
-  "disbursementDate": "2026-07-25"
+  "fieldOfficerEmployeeId": 4001,
+  "fieldOfficerEmployeeName": "Liu Yang",
+  "disbursementDatetime": "2026-08-01T12:00:00+08:00"
 }
 ```
 
----
+### Error Response Format
 
-## 包结构
+```json
+{ "code": "STATE_CONFLICT", "message": "...", "timestamp": "..." }
+```
 
-```
-org.example.amartha.loan
-├── LoanApplication.java          # Spring Boot 入口
-├── controller/
-│   ├── LoanController.java       # REST 控制器
-│   └── GlobalExceptionHandler.java
-├── model/
-│   ├── Loan.java                 # 贷款实体（含状态委托）
-│   ├── LoanStateEnum.java        # 状态枚举
-│   ├── Approval.java             # 批准信息（值对象）
-│   ├── Investment.java           # 投资（值对象）
-│   └── Disbursement.java         # 放款信息（值对象）
-├── state/
-│   ├── LoanStateHandler.java     # 状态接口
-│   ├── ProposedState.java        # PROPOSED 状态处理器
-│   ├── ApprovedState.java        # APPROVED 状态处理器
-│   ├── InvestedState.java        # INVESTED 状态处理器
-│   └── DisbursedState.java       # DISBURSED 状态处理器
-├── dto/
-│   ├── CreateLoanRequest.java
-│   ├── ApproveLoanRequest.java
-│   ├── InvestRequest.java
-│   ├── DisburseRequest.java
-│   └── LoanResponse.java
-├── service/
-│   ├── LoanService.java          # 业务逻辑 + 状态机编排
-│   └── NotificationService.java  # 通知服务（日志桩）
-└── repository/
-    └── LoanRepository.java       # JPA Repository
-```
+| HTTP | Code | Meaning |
+|------|------|---------|
+| 400 | `BAD_REQUEST` | Missing/invalid params, loan not found |
+| 400 | `VALIDATION` | `@Valid` constraint violation |
+| 409 | `STATE_CONFLICT` | Illegal state transition |
+| 500 | `INTERNAL` | Unexpected error |
 
 ---
 
-## 技术选型
+## Validation Rules (Jakarta Validation)
 
-| 组件     | 选择                                                | 说明                                              |
-|----------|-----------------------------------------------------|---------------------------------------------------|
-| 语言     | Java 21                                             | 项目要求                                          |
-| 框架     | Spring Boot 3.5.x                                   | REST API + DI + Validation                        |
-| 构建工具 | Maven                                               | 项目已有                                          |
-| 数据库   | H2（内存）                                          | 开发/演示用                                       |
-| ORM      | Spring Data JPA                                     | 简化数据访问                                      |
-| 代码简化 | Lombok                                              | 替代手写 getter/setter/构造器                     |
-| 参数校验 | Jakarta Validation + Spring Boot Starter Validation | `@Valid` + `@NotBlank` / `@NotNull` / `@Positive` |
-| 测试     | JUnit 5 + Mockito + MockMvc                         | 单元测试 + Controller 集成测试                    |
+| DTO | Field | Constraint |
+|-----|-------|-----------|
+| All | ID fields | `@NotNull` `@Positive` |
+| `CreateLoanRequest` | `interestRate`, `roi` | `@DecimalMin(0)` `@DecimalMax(100)` |
+| `CreateLoanRequest` | `currency` | `@NotBlank` |
+| `ApproveLoanRequest` | `validatorPhotoUrls` | `@NotEmpty` `@Size(max=20)` |
+| `InvestRequest` | `currency` | `@Size(min=3,max=3)` |
+| `DisburseRequest` | `signedAgreementUrl` | `@NotBlank` `@Size(max=2000)` |
+
+---
+
+## Database
+
+- **H2** file-based, MySQL compatibility mode
+- **TCP server** on port 9092 (shared by app + CLI/browser)
+- **6 tables**: `loans`, `approvals`, `approval_photos`, `investments`, `disbursements`, `investors`
+- No foreign key constraints (by design — production anti-pattern)
+- Indexes on all FK columns + `loans.curr_state` + `loans.borrower_id`
+- Schema: `src/main/resources/schema.sql`
+- Test data (auto-executed): `src/main/resources/test_data.sql`
+
+### H2 Console
+
+`http://localhost:8080/h2-console` | JDBC URL: `jdbc:h2:tcp://localhost:9092/./loanengine` | user: `sa`
+
+---
+
+## Logging
+
+- **Log4j2** (`log4j2-spring.xml`)
+- `logs/app.log` — INFO+ for `org.example.amartha` (business audit trail)
+- `logs/error.log` — WARN+ for all packages (alert aggregation)
+- Controller logs full request body on entry
+- State handlers log transitions at INFO, illegal attempts at WARN
+
+---
+
+## Testing
+
+- **26 pure JUnit 5 tests** (`LoanStateHandlerTest`) — no Spring container
+  - Success paths, validation failures, illegal transitions
+  - Edge cases: zero amount, overflow, exact remaining, null fields
+- Run: `mvn test`
+
+---
+
+## Tech Stack
+
+| Component | Choice |
+|-----------|--------|
+| Language | Java 21 |
+| Framework | Spring Boot 3.5.x |
+| Build | Maven |
+| Database | H2 (file-based, MySQL mode, TCP) |
+| Data access | `JdbcTemplate` + handwritten SQL (no ORM) |
+| Logging | Log4j2 |
+| Boilerplate | Lombok (`@Getter`, `@Setter`, `@Slf4j`, …) |
+| Validation | Jakarta Validation |
+| Testing | JUnit 5 + Mockito |
+
+---
+
+## TODO
+
+- [ ] **Agreement letter generation** — when loan transitions to INVESTED, generate a PDF agreement letter URL and notify all investors (currently stubbed; `LoanService.investLoan` has the TODO).
+- [ ] `Investor` entity wired to investments (currently standalone model only).
+- [ ] Service layer integration tests with real H2.
