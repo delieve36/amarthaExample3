@@ -73,7 +73,7 @@ CREATE TABLE investments (
     amount        BIGINT     NOT NULL,
     currency      VARCHAR(3) NOT NULL DEFAULT 'USD',
     datetime      TIMESTAMP WITH TIME ZONE NOT NULL,
-    fund_received BOOLEAN    NOT NULL DEFAULT FALSE
+    fund_status   VARCHAR(20) NOT NULL DEFAULT 'PENDING'
 );
 
 CREATE INDEX idx_investments_loan     ON investments(loan_id);
@@ -91,7 +91,7 @@ CREATE TABLE disbursements (
     field_officer_employee_id   BIGINT     NOT NULL,
     field_officer_employee_name VARCHAR(255),
     disbursement_datetime       TIMESTAMP WITH TIME ZONE NOT NULL,
-    success                     BOOLEAN    NOT NULL DEFAULT FALSE
+    status                       VARCHAR(20) NOT NULL DEFAULT 'PENDING'
 );
 
 CREATE INDEX idx_disbursements_loan ON disbursements(loan_id);

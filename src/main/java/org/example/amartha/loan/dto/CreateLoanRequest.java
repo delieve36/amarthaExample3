@@ -1,5 +1,7 @@
 package org.example.amartha.loan.dto;
 
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -28,9 +30,13 @@ public class CreateLoanRequest {
     private BigDecimal principalAmount;
 
     @NotNull(message = "interestRate is required")
+    @DecimalMin(value = "0.00", message = "interestRate must be >= 0")
+    @DecimalMax(value = "100.00", message = "interestRate must be <= 100")
     private BigDecimal interestRate;
 
     @NotNull(message = "roi is required")
+    @DecimalMin(value = "0.00", message = "roi must be >= 0")
+    @DecimalMax(value = "100.00", message = "roi must be <= 100")
     private BigDecimal roi;
 
     @NotBlank(message = "currency is required")

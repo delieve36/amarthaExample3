@@ -1,6 +1,7 @@
 package org.example.amartha.loan.repository;
 
 import org.example.amartha.loan.model.Disbursement;
+import org.example.amartha.loan.model.DisbursementStatus;
 import org.springframework.jdbc.core.RowMapper;
 
 import java.sql.ResultSet;
@@ -22,7 +23,7 @@ public class DisbursementRowMapper implements RowMapper<Disbursement> {
         d.setFieldOfficerEmployeeId(rs.getLong("field_officer_employee_id"));
         d.setFieldOfficerEmployeeName(rs.getString("field_officer_employee_name"));
         d.setDisbursementDatetime(rs.getObject("disbursement_datetime", java.time.OffsetDateTime.class));
-        d.setSuccess(rs.getBoolean("success"));
+        d.setStatus(DisbursementStatus.valueOf(rs.getString("status")));
         return d;
     }
 }

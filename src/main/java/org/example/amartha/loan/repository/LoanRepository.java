@@ -173,7 +173,7 @@ public class LoanRepository {
             Timestamp.valueOf(now), Timestamp.valueOf(now),
             loanId, investment.getInvestorId(), investment.getInvestorName(),
             investment.getAmount(), investment.getCurrency(),
-            investment.getDatetime(), investment.isFundReceived());
+            investment.getDatetime(), investment.getFundStatus().name());
         investment.setGmtCreate(now);
         investment.setGmtModify(now);
     }
@@ -235,7 +235,7 @@ public class LoanRepository {
             disbursement.getLoanId(), disbursement.getSignedAgreementUrl(),
             disbursement.getFieldOfficerEmployeeId(),
             disbursement.getFieldOfficerEmployeeName(),
-            disbursement.getDisbursementDatetime(), disbursement.isSuccess());
+            disbursement.getDisbursementDatetime(), disbursement.getStatus().name());
         disbursement.setGmtCreate(now);
         disbursement.setGmtModify(now);
     }

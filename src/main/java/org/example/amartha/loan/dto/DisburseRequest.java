@@ -2,6 +2,8 @@ package org.example.amartha.loan.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -18,9 +20,11 @@ import java.time.OffsetDateTime;
 public class DisburseRequest {
 
     @NotBlank(message = "signedAgreementUrl is required")
+    @Size(max = 2000, message = "signedAgreementUrl exceeds 2000 characters")
     private String signedAgreementUrl;
 
     @NotNull(message = "fieldOfficerEmployeeId is required")
+    @Positive(message = "fieldOfficerEmployeeId must be positive")
     private Long fieldOfficerEmployeeId;
 
     private String fieldOfficerEmployeeName;

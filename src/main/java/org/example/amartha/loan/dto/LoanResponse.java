@@ -87,7 +87,7 @@ public class LoanResponse {
         private BigDecimal amount;
         private String currency;
         private OffsetDateTime datetime;
-        private boolean fundReceived;
+        private FundStatus fundStatus;
 
         static InvestmentInfo from(Investment i) {
             InvestmentInfo info = new InvestmentInfo();
@@ -97,7 +97,7 @@ public class LoanResponse {
             info.setAmount(i.getAmount());
             info.setCurrency(i.getCurrency());
             info.setDatetime(i.getDatetime());
-            info.setFundReceived(i.isFundReceived());
+            info.setFundStatus(i.getFundStatus());
             return info;
         }
     }
@@ -112,7 +112,7 @@ public class LoanResponse {
         private Long fieldOfficerEmployeeId;
         private String fieldOfficerEmployeeName;
         private OffsetDateTime disbursementDatetime;
-        private boolean success;
+        private DisbursementStatus status;
 
         static DisbursementInfo from(Disbursement d) {
             DisbursementInfo info = new DisbursementInfo();
@@ -121,7 +121,7 @@ public class LoanResponse {
             info.setFieldOfficerEmployeeId(d.getFieldOfficerEmployeeId());
             info.setFieldOfficerEmployeeName(d.getFieldOfficerEmployeeName());
             info.setDisbursementDatetime(d.getDisbursementDatetime());
-            info.setSuccess(d.isSuccess());
+            info.setStatus(d.getStatus());
             return info;
         }
     }

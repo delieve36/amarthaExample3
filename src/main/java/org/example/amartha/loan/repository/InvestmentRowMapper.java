@@ -1,5 +1,6 @@
 package org.example.amartha.loan.repository;
 
+import org.example.amartha.loan.model.FundStatus;
 import org.example.amartha.loan.model.Investment;
 import org.springframework.jdbc.core.RowMapper;
 
@@ -23,7 +24,7 @@ public class InvestmentRowMapper implements RowMapper<Investment> {
         inv.setAmount(rs.getBigDecimal("amount"));
         inv.setCurrency(rs.getString("currency"));
         inv.setDatetime(rs.getObject("datetime", java.time.OffsetDateTime.class));
-        inv.setFundReceived(rs.getBoolean("fund_received"));
+        inv.setFundStatus(FundStatus.valueOf(rs.getString("fund_status")));
         return inv;
     }
 }

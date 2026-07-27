@@ -49,6 +49,6 @@ public class Investment {
     /** 投资时间（含时区） */
     private OffsetDateTime datetime;
 
-    /** 资金是否已到账 */
-    private boolean fundReceived;
+    /** 资金到账状态 */
+    private FundStatus fundStatus;
 }
