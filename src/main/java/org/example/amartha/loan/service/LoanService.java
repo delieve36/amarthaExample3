@@ -29,14 +29,21 @@ public class LoanService {
     // Lifecycle
     // ========================================================================
 
-    public Loan createLoan(Long borrowerId, BigDecimal principalAmount,
+    public Loan createLoan(Long borrowerId, String borrowerName, BigDecimal principalAmount,
                            BigDecimal interestRate, BigDecimal roi, String currency) {
         Loan loan = new Loan(borrowerId, principalAmount, interestRate, roi, currency);
+        loan.setBorrowerName(borrowerName);
         loan.setInitDatetime(java.time.OffsetDateTime.now());
         loan = loanRepository.save(loan);
         log.info("Loan created: id={} borrower={} amount={} {} state={}",
             loan.getId(), borrowerId, principalAmount, currency, loan.getCurrState());
         return loan;
+    }
+
+    @Transactional(readOnly = true)
+    public Loan queryLoan(Long loanId) {
+        return loanRepository.findById(loanId)
+                .orElseThrow(() -> new IllegalArgumentException("Loan not found: " + loanId));
     }
 
     // ========================================================================
