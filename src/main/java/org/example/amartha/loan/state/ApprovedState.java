@@ -60,4 +60,15 @@ public final class ApprovedState extends AbstractLoanState {
             newTotal, loan.getPrincipalAmount());
         return LoanStateEnum.APPROVED;
     }
+
+    @Override
+    public LoanStateEnum disburse(Loan loan, Disbursement disbursement) {
+        BigDecimal invested = loan.getInvestments().stream()
+            .map(Investment::getAmount)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        throw new IllegalStateException(
+            "Cannot disburse — loan is not fully invested. " +
+            "Invested: " + invested + " / " + loan.getPrincipalAmount() +
+            " (id=" + loan.getId() + ")");
+    }
 }

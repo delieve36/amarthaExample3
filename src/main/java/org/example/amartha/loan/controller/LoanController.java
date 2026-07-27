@@ -59,9 +59,18 @@ public class LoanController {
         investment.setAmount(req.getAmount());
         investment.setCurrency(req.getCurrency());
         investment.setDatetime(req.getDatetime());
+        investment.setFundStatus(req.getFundStatus() != null ? req.getFundStatus() : FundStatus.PENDING);
 
         Loan loan = loanService.investLoan(id, investment);
         return ResponseEntity.ok(LoanResponse.from(loan));
+    }
+
+    @PatchMapping("/{loanId}/investments/{investmentId}/receive")
+    public ResponseEntity<Void> receiveFunds(@PathVariable Long loanId,
+                                              @PathVariable Long investmentId) {
+        log.info("PATCH /api/loans/{}/investments/{}/receive", loanId, investmentId);
+        loanService.receiveFunds(loanId, investmentId);
+        return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{id}/disburse")

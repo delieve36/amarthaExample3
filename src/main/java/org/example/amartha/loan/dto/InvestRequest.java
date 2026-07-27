@@ -12,6 +12,8 @@ import lombok.ToString;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 
+import org.example.amartha.loan.model.FundStatus;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -34,4 +36,6 @@ public class InvestRequest {
     private String currency;
 
     private OffsetDateTime datetime;
+
+    private FundStatus fundStatus;
 }

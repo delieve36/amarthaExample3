@@ -2,6 +2,7 @@ package org.example.amartha.loan.repository;
 
 import org.example.amartha.loan.model.Approval;
 import org.example.amartha.loan.model.Disbursement;
+import org.example.amartha.loan.model.FundStatus;
 import org.example.amartha.loan.model.Investment;
 import org.example.amartha.loan.model.Loan;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -161,21 +162,41 @@ public class LoanRepository {
     }
 
     @Transactional
-    public void saveInvestment(Long loanId, Investment investment) {
+    public Investment saveInvestment(Long loanId, Investment investment) {
         String sql = """
             INSERT INTO investments (gmt_create, gmt_modify,
                                      loan_id, investor_id, investor_name,
-                                     amount, currency, datetime, fund_received)
+                                     amount, currency, datetime, fund_status)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """;
         LocalDateTime now = LocalDateTime.now();
-        jdbc.update(sql,
-            Timestamp.valueOf(now), Timestamp.valueOf(now),
-            loanId, investment.getInvestorId(), investment.getInvestorName(),
-            investment.getAmount(), investment.getCurrency(),
-            investment.getDatetime(), investment.getFundStatus().name());
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbc.update(connection -> {
+            PreparedStatement ps = connection.prepareStatement(sql, new String[]{"id"});
+            ps.setTimestamp(1, Timestamp.valueOf(now));
+            ps.setTimestamp(2, Timestamp.valueOf(now));
+            ps.setLong(3, loanId);
+            ps.setLong(4, investment.getInvestorId());
+            ps.setString(5, investment.getInvestorName());
+            ps.setBigDecimal(6, investment.getAmount());
+            ps.setString(7, investment.getCurrency());
+            ps.setObject(8, investment.getDatetime());
+            ps.setString(9, investment.getFundStatus().name());
+            return ps;
+        }, keyHolder);
+        Number key = keyHolder.getKey();
+        if (key != null) {
+            investment.setId(key.longValue());
+        }
         investment.setGmtCreate(now);
         investment.setGmtModify(now);
+        return investment;
+    }
+
+    @Transactional
+    public void updateInvestmentFundStatus(Long investmentId, FundStatus status) {
+        String sql = "UPDATE investments SET fund_status = ?, gmt_modify = ? WHERE id = ?";
+        jdbc.update(sql, status.name(), Timestamp.valueOf(LocalDateTime.now()), investmentId);
     }
 
     @Transactional
@@ -226,7 +247,7 @@ public class LoanRepository {
                                        loan_id, signed_agreement_url,
                                        field_officer_employee_id,
                                        field_officer_employee_name,
-                                       disbursement_datetime, success)
+                                       disbursement_datetime, disbursed)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """;
         LocalDateTime now = LocalDateTime.now();
@@ -235,7 +256,7 @@ public class LoanRepository {
             disbursement.getLoanId(), disbursement.getSignedAgreementUrl(),
             disbursement.getFieldOfficerEmployeeId(),
             disbursement.getFieldOfficerEmployeeName(),
-            disbursement.getDisbursementDatetime(), disbursement.getStatus().name());
+            disbursement.getDisbursementDatetime(), disbursement.isDisbursed());
         disbursement.setGmtCreate(now);
         disbursement.setGmtModify(now);
     }

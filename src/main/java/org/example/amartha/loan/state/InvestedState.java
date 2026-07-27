@@ -34,7 +34,14 @@ public final class InvestedState extends AbstractLoanState {
         }
 
         disbursement.setLoanId(loan.getId());
+        disbursement.setDisbursed(true);
         loan.setDisbursement(disbursement);
+
+        if (disbursement.getDisbursementDatetime().isAfter(java.time.OffsetDateTime.now())) {
+            log.warn("FUTURE DISBURSEMENT — would send Kafka message: loan={} officer={} scheduled={}",
+                loan.getId(), disbursement.getFieldOfficerEmployeeId(),
+                disbursement.getDisbursementDatetime());
+        }
 
         log.info("Loan {} disbursed by officer {} — {} → DISBURSED",
             loan.getId(), disbursement.getFieldOfficerEmployeeId(), stateName());

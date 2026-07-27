@@ -91,7 +91,7 @@ CREATE TABLE disbursements (
     field_officer_employee_id   BIGINT     NOT NULL,
     field_officer_employee_name VARCHAR(255),
     disbursement_datetime       TIMESTAMP WITH TIME ZONE NOT NULL,
-    status                       VARCHAR(20) NOT NULL DEFAULT 'PENDING'
+    disbursed                     BOOLEAN    NOT NULL DEFAULT FALSE
 );
 
 CREATE INDEX idx_disbursements_loan ON disbursements(loan_id);

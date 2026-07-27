@@ -112,7 +112,7 @@ public class LoanResponse {
         private Long fieldOfficerEmployeeId;
         private String fieldOfficerEmployeeName;
         private OffsetDateTime disbursementDatetime;
-        private DisbursementStatus status;
+        private boolean disbursed;
 
         static DisbursementInfo from(Disbursement d) {
             DisbursementInfo info = new DisbursementInfo();
@@ -121,7 +121,7 @@ public class LoanResponse {
             info.setFieldOfficerEmployeeId(d.getFieldOfficerEmployeeId());
             info.setFieldOfficerEmployeeName(d.getFieldOfficerEmployeeName());
             info.setDisbursementDatetime(d.getDisbursementDatetime());
-            info.setStatus(d.getStatus());
+            info.setDisbursed(d.isDisbursed());
             return info;
         }
     }

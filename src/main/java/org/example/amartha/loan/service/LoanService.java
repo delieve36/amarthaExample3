@@ -73,7 +73,14 @@ public class LoanService {
 
         loanRepository.saveInvestment(loanId, investment);
 
-        // TODO: if transitioned to INVESTED, generate agreement letter & notify
+        if (loan.getCurrState() == LoanStateEnum.INVESTED) {
+            boolean allReceived = loan.getInvestments().stream()
+                .allMatch(inv -> inv.getFundStatus() == FundStatus.RECEIVED);
+            if (allReceived) {
+                loan.setFundsReceivedDatetime(java.time.OffsetDateTime.now());
+            }
+            // TODO: generate agreement letter & notify
+        }
 
         loan = loanRepository.update(loan);
         log.info("Investment persisted: loan={} investor={} amount={}",
@@ -93,5 +100,22 @@ public class LoanService {
 
         log.info("Loan {} disbursed — persisted disbursement record", loanId);
         return loan;
+    }
+
+    @Transactional
+    public void receiveFunds(Long loanId, Long investmentId) {
+        loanRepository.updateInvestmentFundStatus(investmentId, FundStatus.RECEIVED);
+        log.info("Investment {} funds marked as RECEIVED", investmentId);
+
+        Loan loan = loanRepository.findById(loanId)
+            .orElseThrow(() -> new IllegalArgumentException("Loan not found: " + loanId));
+
+        boolean allReceived = loan.getInvestments().stream()
+            .allMatch(inv -> inv.getFundStatus() == FundStatus.RECEIVED);
+        if (allReceived) {
+            loan.setFundsReceivedDatetime(java.time.OffsetDateTime.now());
+            loanRepository.update(loan);
+            log.info("Loan {} — all investments received", loanId);
+        }
     }
 }

@@ -45,6 +45,6 @@ public class Disbursement {
     /** 放款时间（含时区） */
     private OffsetDateTime disbursementDatetime;
 
-    /** 放款执行状态 */
-    private DisbursementStatus status;
+    /** 放款是否已执行 */
+    private boolean disbursed;
 }
