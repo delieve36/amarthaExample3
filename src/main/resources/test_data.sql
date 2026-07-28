@@ -23,3 +23,13 @@ VALUES (1, 'https://storage.example.com/photos/proof1.jpg');
 
 INSERT INTO approval_photos (approval_id, photo_url)
 VALUES (1, 'https://storage.example.com/photos/proof2.jpg');
+
+-- Test investors
+INSERT INTO investors (investor_id, name, email_url, register_date)
+VALUES (3001, 'Alice Wang', 'alice@example.com', '2025-01-15');
+
+INSERT INTO investors (investor_id, name, email_url, register_date)
+VALUES (3002, 'Bob Chen', 'bob@example.com', '2025-03-20');
+
+INSERT INTO investors (investor_id, name, email_url, register_date)
+VALUES (3003, 'Carol Liu', 'carol@example.com', '2025-06-10');

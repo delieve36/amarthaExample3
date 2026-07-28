@@ -3,6 +3,8 @@
 -- Target:   H2 (MySQL compatibility mode)
 -- ====================================================================
 
+DROP TABLE IF EXISTS notification_outbox;
+DROP TABLE IF EXISTS investors;
 DROP TABLE IF EXISTS disbursements;
 DROP TABLE IF EXISTS approval_photos;
 DROP TABLE IF EXISTS investments;
@@ -95,3 +97,37 @@ CREATE TABLE disbursements (
 );
 
 CREATE INDEX idx_disbursements_loan ON disbursements(loan_id);
+
+-- -------------------------------------------------------------------
+-- investors — 投资者档案
+-- -------------------------------------------------------------------
+CREATE TABLE investors (
+    id              BIGINT AUTO_INCREMENT PRIMARY KEY,
+    investor_id     BIGINT       NOT NULL UNIQUE,
+    name            VARCHAR(255) NOT NULL,
+    email_url       VARCHAR(500) NOT NULL,
+    register_date   DATE
+);
+
+CREATE INDEX idx_investors_investor_id ON investors(investor_id);
+
+-- -------------------------------------------------------------------
+-- notification_outbox — 通知发送记录（发件箱模式，与主流程解耦）
+-- -------------------------------------------------------------------
+CREATE TABLE notification_outbox (
+    id               BIGINT AUTO_INCREMENT PRIMARY KEY,
+    gmt_create       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    gmt_modify       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    loan_id          BIGINT       NOT NULL,
+    investor_id      BIGINT       NOT NULL,
+    recipient_email  VARCHAR(500) NOT NULL,
+    type             VARCHAR(50)  NOT NULL DEFAULT 'AGREEMENT_LETTER',
+    status           VARCHAR(20)  NOT NULL DEFAULT 'PENDING',
+    agreement_url    VARCHAR(2000),
+    sent_datetime    TIMESTAMP WITH TIME ZONE,
+    error_message    VARCHAR(1000),
+    retry_count      INT          NOT NULL DEFAULT 0
+);
+
+CREATE INDEX idx_notif_loan     ON notification_outbox(loan_id);
+CREATE INDEX idx_notif_status   ON notification_outbox(status);
