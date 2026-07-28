@@ -1,13 +1,16 @@
 package org.example.amartha.loan.service;
 
 import lombok.extern.slf4j.Slf4j;
+import org.example.amartha.loan.event.LoanFullyInvestedEvent;
 import org.example.amartha.loan.model.*;
 import org.example.amartha.loan.repository.LoanRepository;
 import org.example.amartha.loan.state.LoanStateHandler;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 
 /**
  * Loan lifecycle orchestrator — delegates state transitions to
@@ -20,9 +23,15 @@ import java.math.BigDecimal;
 public class LoanService {
 
     private final LoanRepository loanRepository;
+    private final AgreementService agreementService;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public LoanService(LoanRepository loanRepository) {
+    public LoanService(LoanRepository loanRepository,
+                       AgreementService agreementService,
+                       ApplicationEventPublisher eventPublisher) {
         this.loanRepository = loanRepository;
+        this.agreementService = agreementService;
+        this.eventPublisher = eventPublisher;
     }
 
     // ========================================================================
@@ -74,15 +83,28 @@ public class LoanService {
         loanRepository.saveInvestment(loanId, investment);
 
         if (loan.getCurrState() == LoanStateEnum.INVESTED) {
+            // 1. Generate agreement letter URL and persist
+            String agreementUrl = agreementService.generateAgreementUrl(loan.getId());
+            loan.setAgreeLetterUrl(agreementUrl);
+            loan.setAgreeLetterSendDatetime(OffsetDateTime.now());
+
+            // 2. Check if all funds received
             boolean allReceived = loan.getInvestments().stream()
                 .allMatch(inv -> inv.getFundStatus() == FundStatus.RECEIVED);
             if (allReceived) {
-                loan.setFundsReceivedDatetime(java.time.OffsetDateTime.now());
+                loan.setFundsReceivedDatetime(OffsetDateTime.now());
             }
-            // TODO: generate agreement letter & notify
         }
 
         loan = loanRepository.update(loan);
+
+        // 3. Publish event AFTER URL is persisted (async listener handles email)
+        if (loan.getCurrState() == LoanStateEnum.INVESTED) {
+            eventPublisher.publishEvent(new LoanFullyInvestedEvent(loan));
+            log.info("Loan {} — published LoanFullyInvestedEvent for agreement={}",
+                loanId, loan.getAgreeLetterUrl());
+        }
+
         log.info("Investment persisted: loan={} investor={} amount={}",
             loanId, investment.getInvestorId(), investment.getAmount());
         return loan;
