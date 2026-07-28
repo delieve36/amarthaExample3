@@ -21,7 +21,7 @@ import java.time.LocalDate;
 public class Investor {
 
     /** 投资者唯一标识 */
-    private String investorId;
+    private Long investorId;
 
     /** 投资者姓名 */
     private String name;
