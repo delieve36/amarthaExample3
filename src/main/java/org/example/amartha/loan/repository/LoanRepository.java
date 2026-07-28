@@ -65,6 +65,30 @@ public class LoanRepository {
         return Optional.of(loan);
     }
 
+    /**
+     * Pessimistic-lock read for investment flow — prevents concurrent over-investment.
+     * <p>Uses {@code SELECT ... FOR UPDATE} to serialize investment writes
+     * on the same loan row. Must be called inside an active transaction.</p>
+     */
+    public Optional<Loan> findByIdForUpdate(Long id) {
+        String sql = "SELECT * FROM loans WHERE id = ? FOR UPDATE";
+        List<Loan> result = jdbc.query(sql, loanRowMapper, id);
+        if (result.isEmpty()) return Optional.empty();
+
+        Loan loan = result.get(0);
+
+        // eager: load approval (including photos)
+        findApprovalByLoanId(id).ifPresent(loan::setApproval);
+
+        // eager: load investments
+        loan.setInvestments(findInvestmentsByLoanId(id));
+
+        // eager: load disbursement
+        findDisbursementByLoanId(id).ifPresent(loan::setDisbursement);
+
+        return Optional.of(loan);
+    }
+
     private Optional<Approval> findApprovalByLoanId(Long loanId) {
         String sql = "SELECT * FROM approvals WHERE loan_id = ?";
         List<Approval> results = jdbc.query(sql, approvalRowMapper, loanId);

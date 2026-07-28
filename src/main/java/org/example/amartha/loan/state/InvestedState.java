@@ -23,9 +23,7 @@ public final class InvestedState extends AbstractLoanState {
         if (disbursement == null) {
             throw new IllegalArgumentException("Disbursement must not be null");
         }
-        if (disbursement.getSignedAgreementUrl() == null || disbursement.getSignedAgreementUrl().isBlank()) {
-            throw new IllegalArgumentException("Disbursement must include signedAgreementUrl");
-        }
+        validateSignedAgreementUrl(disbursement);
         if (disbursement.getFieldOfficerEmployeeId() == null) {
             throw new IllegalArgumentException("Disbursement must include fieldOfficerEmployeeId");
         }
@@ -46,5 +44,17 @@ public final class InvestedState extends AbstractLoanState {
         log.info("Loan {} disbursed by officer {} — {} → DISBURSED",
             loan.getId(), disbursement.getFieldOfficerEmployeeId(), stateName());
         return LoanStateEnum.DISBURSED;
+    }
+
+    private void validateSignedAgreementUrl(Disbursement disbursement) {
+        String url = disbursement.getSignedAgreementUrl();
+        if (url == null || url.isBlank()) {
+            throw new IllegalArgumentException("Disbursement must include signedAgreementUrl");
+        }
+        String lowered = url.toLowerCase();
+        if (!lowered.endsWith(".pdf") && !lowered.endsWith(".jpeg") && !lowered.endsWith(".jpg")) {
+            throw new IllegalArgumentException(
+                "signedAgreementUrl must be a pdf or jpeg file — got: " + url);
+        }
     }
 }

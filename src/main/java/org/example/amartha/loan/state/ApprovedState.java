@@ -31,6 +31,10 @@ public final class ApprovedState extends AbstractLoanState {
         if (investment.getAmount() == null || investment.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Investment amount must be positive");
         }
+        if (investment.getCurrency() == null || !investment.getCurrency().equals(loan.getCurrency())) {
+            throw new IllegalArgumentException(
+                "Investment currency (" + investment.getCurrency() + ") must match loan currency (" + loan.getCurrency() + ")");
+        }
 
         BigDecimal totalBefore = loan.getInvestments().stream()
             .map(Investment::getAmount)

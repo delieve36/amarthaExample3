@@ -65,7 +65,7 @@ public class LoanService {
     }
 
     public Loan investLoan(Long loanId, Investment investment) {
-        Loan loan = loanRepository.findById(loanId)
+        Loan loan = loanRepository.findByIdForUpdate(loanId)
             .orElseThrow(() -> new IllegalArgumentException("Loan not found: " + loanId));
 
         LoanStateHandler handler = LoanStateHandler.forState(loan.getCurrState());
@@ -109,6 +109,12 @@ public class LoanService {
 
         Loan loan = loanRepository.findById(loanId)
             .orElseThrow(() -> new IllegalArgumentException("Loan not found: " + loanId));
+
+        // guard: only set once to avoid race on concurrent receiveFunds calls
+        if (loan.getFundsReceivedDatetime() != null) {
+            log.debug("Loan {} fundsReceivedDatetime already set — skipping", loanId);
+            return;
+        }
 
         boolean allReceived = loan.getInvestments().stream()
             .allMatch(inv -> inv.getFundStatus() == FundStatus.RECEIVED);
