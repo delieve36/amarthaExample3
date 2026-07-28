@@ -246,6 +246,26 @@ class LoanStateHandlerTest {
             assertThrows(IllegalStateException.class,
                 () -> LoanStateHandler.forState(LoanStateEnum.APPROVED).disburse(loan, validDisbursement()));
         }
+
+        @Test
+        @DisplayName("invest with currency mismatch → IllegalArgumentException")
+        void invest_currencyMismatch() {
+            Loan loan = approvedLoan(5000);
+            Investment inv = validInvestment(1000);
+            inv.setCurrency("IDR");
+            assertThrows(IllegalArgumentException.class,
+                () -> LoanStateHandler.forState(LoanStateEnum.APPROVED).invest(loan, inv));
+        }
+
+        @Test
+        @DisplayName("invest with null currency → IllegalArgumentException")
+        void invest_nullCurrency() {
+            Loan loan = approvedLoan(5000);
+            Investment inv = validInvestment(1000);
+            inv.setCurrency(null);
+            assertThrows(IllegalArgumentException.class,
+                () -> LoanStateHandler.forState(LoanStateEnum.APPROVED).invest(loan, inv));
+        }
     }
 
     @Nested
@@ -323,6 +343,16 @@ class LoanStateHandlerTest {
             Loan loan = investedLoan();
             Disbursement d = validDisbursement();
             d.setDisbursementDatetime(null);
+            assertThrows(IllegalArgumentException.class,
+                () -> LoanStateHandler.forState(LoanStateEnum.INVESTED).disburse(loan, d));
+        }
+
+        @Test
+        @DisplayName("disburse with non-pdf/jpeg file type → IllegalArgumentException")
+        void disburse_invalidFileType() {
+            Loan loan = investedLoan();
+            Disbursement d = validDisbursement();
+            d.setSignedAgreementUrl("https://example.com/agreement.txt");
             assertThrows(IllegalArgumentException.class,
                 () -> LoanStateHandler.forState(LoanStateEnum.INVESTED).disburse(loan, d));
         }
