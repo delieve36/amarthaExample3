@@ -36,7 +36,7 @@ class AgreementServiceTest {
     @DisplayName("generateAgreementUrl → correct URL format")
     void generateAgreementUrl_shouldReturnCorrectUrl() {
         String url = service.generateAgreementUrl(42L);
-        assertEquals("http://localhost:8080/api/loans/42/agreement", url);
+        assertEquals("http://localhost:8080/api/loans/agreement/42", url);
     }
 
     @Test

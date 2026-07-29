@@ -47,7 +47,7 @@ class InvestorNotificationListenerTest {
         Loan loan = new Loan(1001L, BigDecimal.valueOf(5000), BigDecimal.TEN, BigDecimal.valueOf(8), "USD");
         loan.setId(1L);
         loan.setCurrState(LoanStateEnum.INVESTED);
-        loan.setAgreeLetterUrl("http://localhost:8080/api/loans/1/agreement");
+        loan.setAgreeLetterUrl("http://localhost:8080/api/loans/agreement/1");
 
         Investment inv1 = new Investment();
         inv1.setInvestorId(3001L);
@@ -151,7 +151,7 @@ class InvestorNotificationListenerTest {
         inserted.forEach(ob -> {
             assertEquals(1L, ob.getLoanId());
             assertEquals(NotificationType.AGREEMENT_LETTER, ob.getType());
-            assertEquals("http://localhost:8080/api/loans/1/agreement", ob.getAgreementUrl());
+            assertEquals("http://localhost:8080/api/loans/agreement/1", ob.getAgreementUrl());
         });
     }
 }

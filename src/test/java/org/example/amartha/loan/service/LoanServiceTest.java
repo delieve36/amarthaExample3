@@ -83,12 +83,12 @@ class LoanServiceTest {
         when(loanRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(loan));
         when(loanRepository.update(any())).thenReturn(loan);
         when(agreementService.generateAgreementUrl(1L))
-            .thenReturn("http://localhost:8080/api/loans/1/agreement");
+            .thenReturn("http://localhost:8080/api/loans/agreement/1");
 
         Loan result = loanService.investLoan(1L, validInvestment(5000));
 
         assertEquals(LoanStateEnum.INVESTED, result.getCurrState());
-        assertEquals("http://localhost:8080/api/loans/1/agreement", result.getAgreeLetterUrl());
+        assertEquals("http://localhost:8080/api/loans/agreement/1", result.getAgreeLetterUrl());
         assertNotNull(result.getAgreeLetterSendDatetime());
 
         var captor = ArgumentCaptor.forClass(LoanFullyInvestedEvent.class);
@@ -105,7 +105,7 @@ class LoanServiceTest {
         when(loanRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(loan));
         when(loanRepository.update(any())).thenReturn(loan);
         when(agreementService.generateAgreementUrl(1L))
-            .thenReturn("http://localhost:8080/api/loans/1/agreement");
+            .thenReturn("http://localhost:8080/api/loans/agreement/1");
 
         Loan result = loanService.investLoan(1L, inv);
 
