@@ -355,7 +355,7 @@ See source: `org.example.amartha.loan.model.*`.
 
 ## Testing
 
-- **70 tests** — 61 pure JUnit 5 + 9 integration/unit (MockEmailServiceImpl, NotificationIntegration, LoanRepository)
+- **71 tests** — 62 pure JUnit 5 + 9 integration/unit (MockEmailServiceImpl, NotificationIntegration, LoanRepository)
 - **11 test classes**:
 
 | Class | Cases | What it covers |

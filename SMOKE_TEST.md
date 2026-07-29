@@ -49,13 +49,13 @@ curl --version
 
 ---
 
-## Run Unit Tests (70 tests, < 5 s)
+## Run Unit Tests (71 tests, < 5 s)
 
 ```bash
 mvn test
 ```
 
-Expected: `Tests run: 70, Failures: 0, Errors: 0, Skipped: 0 — BUILD SUCCESS`
+Expected: `Tests run: 71, Failures: 0, Errors: 0, Skipped: 0 — BUILD SUCCESS`
 
 No database or external services needed.
 
@@ -238,7 +238,7 @@ curl -s -X POST $BASE/api/loans/investments \
 ```bash
 curl -s -X PATCH $BASE/api/loans/approve \
   -H 'Content-Type: application/json' \
-  -d "{\"loanId\": $LOAN_ID, \"validatorEmployeeId\": 2001, \"approvalDatetime\": \"2026-08-02T00:00:00+08:00\", \"validatorPhotoUrls\": [\"http://x.jpg\"]}"
+  -d "{\"loanId\": $LOAN_ID, \"validatorEmployeeId\": 2001, \"approvalDatetime\": \"2026-07-28T00:00:00+08:00\", \"validatorPhotoUrls\": [\"http://x.jpg\"]}"
 ```
 
 *Expected: `409 STATE_CONFLICT`.*
@@ -347,7 +347,7 @@ curl -s -X PATCH $BASE/api/loans/approve \
   -d "{\"loanId\": $L2, \"validatorEmployeeId\": 2001, \"approvalDatetime\": \"2026-07-28T00:00:00+08:00\", \"validatorPhotoUrls\": []}"
 ```
 
-*Expected: `400 BAD_REQUEST` — `"Approval must include at least one validator photo URL"`.*
+*Expected: `400 VALIDATION` — `"validatorPhotoUrls must not be empty"`.*
 
 ### C5. Disburse without signed agreement URL
 
@@ -362,12 +362,27 @@ curl -s -X PATCH $BASE/api/loans/disburse \
 ### C6. Disburse with non-pdf/jpeg signed agreement
 
 ```bash
+# Create a loan, approve, and fully invest it first
+C6_LID=$(curl -s -X POST $BASE/api/loans \
+  -H 'Content-Type: application/json' \
+  -d '{"borrowerId": 5001, "principalAmount": 1000, "interestRate": 5.0, "roi": 3.0, "currency": "USD"}' | jq -r .id)
+
+curl -s -X PATCH $BASE/api/loans/approve \
+  -H 'Content-Type: application/json' \
+  -d "{\"loanId\": $C6_LID, \"validatorEmployeeId\": 2001, \"approvalDatetime\": \"2026-07-28T00:00:00+08:00\", \"validatorPhotoUrls\": [\"http://x.jpg\"]}" > /dev/null
+
+curl -s -X POST $BASE/api/loans/investments \
+  -H 'Content-Type: application/json' \
+  -d "{\"loanId\": $C6_LID, \"investorId\": 3001, \"amount\": 1000, \"currency\": \"USD\", \"datetime\": \"2026-07-28T01:00:00+08:00\"}" > /dev/null
+
+# Now disburse with invalid file type
 curl -s -X PATCH $BASE/api/loans/disburse \
   -H 'Content-Type: application/json' \
-  -d '{"loanId": 100, "signedAgreementUrl": "https://example.com/doc.txt", "fieldOfficerEmployeeId": 4001, "disbursementDatetime": "2026-07-28T00:00:00+08:00"}'
+  -d "{\"loanId\": $C6_LID, \"signedAgreementUrl\": \"https://example.com/doc.txt\", \"fieldOfficerEmployeeId\": 4001, \"disbursementDatetime\": \"2026-07-28T00:00:00+08:00\"}" \
+  -w "\nHTTP %{http_code}\n"
 ```
 
-*Expected: `400 BAD_REQUEST` — `"signedAgreementUrl must be a pdf or jpeg file"`.*
+*Expected: `HTTP 400` — `"signedAgreementUrl must be a pdf or jpeg file"`.*
 
 ### C7. Investment with negative amount
 

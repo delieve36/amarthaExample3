@@ -61,19 +61,19 @@ public class InvestorNotificationListener {
             .filter(inv -> inv.getEmailUrl() != null && !inv.getEmailUrl().isBlank())
             .collect(Collectors.toMap(Investor::getInvestorId, Investor::getEmailUrl));
 
-        // 3. Process each investment: insert outbox → send email → update status
+        // 3. Process each unique investor once (dedup by investorId)
         int sent = 0;
         int failed = 0;
-        for (var inv : loan.getInvestments()) {
-            String email = emailMap.get(inv.getInvestorId());
+        for (Long investorId : investorIds) {
+            String email = emailMap.get(investorId);
             if (email == null) {
-                log.warn("No email found for investor {} — skipping", inv.getInvestorId());
+                log.warn("No email found for investor {} — skipping", investorId);
                 continue;
             }
 
-            // 3a. Insert PENDING outbox record
+            // 3a. Insert PENDING outbox record (one per investor per loan)
             NotificationOutbox outbox = NotificationOutbox.createPending(
-                loan.getId(), inv.getInvestorId(), email, loan.getAgreeLetterUrl());
+                loan.getId(), investorId, email, loan.getAgreeLetterUrl());
             outbox = outboxRepository.insert(outbox);
 
             // 3b. Send email

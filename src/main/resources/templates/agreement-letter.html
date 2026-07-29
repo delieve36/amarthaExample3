@@ -19,7 +19,7 @@
 <body>
     <h1>Loan Agreement Letter</h1>
     <div class="meta">
-        Generated: <span th:text="${#temporals.format(java.time.OffsetDateTime.now(), 'yyyy-MM-dd HH:mm:ss z')}">2026-01-01</span><br/>
+        Generated: <span th:text="${#temporals.format(generatedAt, 'yyyy-MM-dd HH:mm:ss z')}">2026-01-01</span><br/>
         Loan ID: <strong th:text="${loan.id}">1</strong>
     </div>
 

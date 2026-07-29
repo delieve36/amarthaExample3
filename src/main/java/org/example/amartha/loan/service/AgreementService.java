@@ -43,6 +43,7 @@ public class AgreementService {
         ctx.setVariable("totalInvested", loan.getInvestments().stream()
             .map(inv -> inv.getAmount())
             .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add));
+        ctx.setVariable("generatedAt", java.time.OffsetDateTime.now());
         return templateEngine.process("agreement-letter", ctx);
     }
 }
