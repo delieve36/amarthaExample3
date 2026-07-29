@@ -97,13 +97,13 @@ public class NotificationOutboxRepository {
      * Mark a single outbox record as SENT.
      */
     @Transactional
-    public void markSent(Long outboxId, java.time.OffsetDateTime sentDatetime) {
+    public int markSent(Long outboxId, java.time.OffsetDateTime sentDatetime) {
         String sql = """
             UPDATE notification_outbox
             SET status = ?, sent_datetime = ?, gmt_modify = ?
-            WHERE id = ?
+            WHERE id = ? AND status IN ('PENDING', 'FAILED')
             """;
-        jdbc.update(sql, NotificationStatus.SENT.name(), sentDatetime,
+        return jdbc.update(sql, NotificationStatus.SENT.name(), sentDatetime,
             Timestamp.valueOf(LocalDateTime.now()), outboxId);
     }
 
@@ -111,13 +111,13 @@ public class NotificationOutboxRepository {
      * Mark a single outbox record as FAILED.
      */
     @Transactional
-    public void markFailed(Long outboxId, String errorMessage) {
+    public int markFailed(Long outboxId, String errorMessage) {
         String sql = """
             UPDATE notification_outbox
             SET status = ?, error_message = ?, retry_count = retry_count + 1, gmt_modify = ?
-            WHERE id = ?
+            WHERE id = ? AND status IN ('PENDING', 'FAILED')
             """;
-        jdbc.update(sql, NotificationStatus.FAILED.name(), errorMessage,
+        return jdbc.update(sql, NotificationStatus.FAILED.name(), errorMessage,
             Timestamp.valueOf(LocalDateTime.now()), outboxId);
     }
 
