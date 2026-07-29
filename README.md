@@ -27,7 +27,7 @@ LoanService (lifecycle orchestrator)
     │            ├─ InvestorRepository  → lookup emails
     │            ├─ NotificationOutboxRepository  → insert PENDING
     │            └─ EmailService (interface)
-    │                 └─ MockEmailServiceImpl  → email.log
+    │                 └─ MockEmailServiceImpl  → logs/email.log
     │
     └─ LoanRepository     ← JdbcTemplate + handwritten SQL
             │
@@ -101,95 +101,226 @@ See source: `org.example.amartha.loan.model.*`.
 
 ---
 
-## State Machine (State Pattern)
+## Key Assumptions Made
+
+- **Amount precision**: `principalAmount`, `interestRate`, `roi`, and investment
+  `amount` use `BigDecimal`. The schema stores amounts as `BIGINT` (integer minor
+  units, e.g. cents); the RowMapper converts transparently. A production MySQL
+  migration would use `DECIMAL` or keep `BIGINT` with `Long` in Java.
+
+- **Role isolation**: `Approval.validatorEmployeeId` (field validator who visits the
+  borrower) and `Disbursement.fieldOfficerEmployeeId` (field officer who hands over
+  money) are intentionally separate — the problem describes them as distinct actors.
+
+- **Agreement letter format**: The problem specifies *"link to agreement letter
+  (pdf)"*. For demo purposes, the agreement letter is rendered as an HTML page via
+  `GET /api/loans/agreement/{id}` using a Thymeleaf template. In production, this
+  would be replaced with a PDF pipeline — `AgreementService` makes this a
+  single-implementation swap.
+
+- **Email delivery**: `MockEmailServiceImpl` writes to `logs/email.log` instead of
+  connecting to an SMTP server. The `EmailService` interface allows a production
+  `SmtpEmailServiceImpl` to be substituted without touching listener or outbox logic.
+
+- **Currency**: Investments must match the loan currency. Multi-currency loans are not
+  supported.
+
+- **No foreign keys**: The schema omits FK constraints to keep the setup portable
+  across H2, MySQL, and PostgreSQL with no migration friction.
+
+- **Investor pre-registration**: Investors must be created via `POST /api/investors`
+  before they can invest; the system looks up their email from the `investors` table
+  at notification time.
+
+- **Loan ID placement**: POST/PATCH endpoints accept `loanId` in the request body
+  rather than the URL path. GET endpoints use standard REST path variables
+  (`/api/loans/{id}`, `/api/loans/agreement/{id}`, `/api/loans/notifications/{id}`).
+
+---
+
+## State Machine
 
 | State | Allowed Operation | → Next State | Validation Rules |
 |-------|------------------|--------------|-------------------|
-| `ProposedState` | `approve()` | `APPROVED` | employeeId, photo URLs, datetime |
-| `ApprovedState` | `invest()` | `INVESTED` (total = principal) | amount > 0, currency match, total ≤ principal |
-| `InvestedState` | `disburse()` | `DISBURSED` | signedAgreementUrl (pdf/jpeg), officerId, datetime |
+| `ProposedState` | `approve()` | `APPROVED` | loanId, employeeId, photo URLs, datetime |
+| `ApprovedState` | `invest()` | `INVESTED` (total = principal) | loanId, amount > 0, currency match, total ≤ principal |
+| `InvestedState` | `disburse()` | `DISBURSED` | loanId, signedAgreementUrl (pdf/jpeg), officerId, datetime |
 | `DisbursedState` | (none) | terminal | — |
 
-**Concurrency**: `LoanRepository.findByIdForUpdate()` uses `SELECT ... FOR UPDATE` to serialize investments on the same loan.
+- `AbstractLoanState` defaults all operations to `IllegalStateException`,
+  preventing skip-transitions (PROPOSED → INVESTED) and reverse transitions.
+- `DisbursedState` overrides nothing — a true terminal state.
+- **Concurrency**: `LoanRepository.findByIdForUpdate()` uses `SELECT ... FOR UPDATE`
+  to serialize investments on the same loan row.
 
 ---
 
 ## REST API
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/loans` | Create loan → 201 (PROPOSED) |
-| `GET` | `/api/loans/{id}` | Get loan details → 200 |
-| `PATCH` | `/api/loans/{id}/approve` | Approve → 200 (→ APPROVED) |
-| `POST` | `/api/loans/{id}/investments` | Invest → 200 (→ INVESTED when fully funded) |
-| `PATCH` | `/api/loans/{id}/investments/{iid}/receive` | Confirm funds → 204 |
-| `PATCH` | `/api/loans/{id}/disburse` | Disburse → 200 (→ DISBURSED) |
-| `GET` | `/api/loans/{id}/agreement` | View agreement letter (HTML) → 200 |
-| `GET` | `/api/loans/{id}/notifications` | Query email send status → 200 |
-| `POST` | `/api/investors` | Create investor profile → 201 |
+### Endpoints
 
-### Request Examples
+| Method | Path | Request Body | Response | Description |
+|--------|------|-------------|----------|-------------|
+| `POST` | `/api/loans` | `CreateLoanRequest` | `201` + `LoanResponse` | Create loan (→ PROPOSED) |
+| `GET` | `/api/loans/{id}` | — | `200` + `LoanResponse` | Get loan details |
+| `PATCH` | `/api/loans/approve` | `ApproveLoanRequest` | `200` + `LoanResponse` | Approve (→ APPROVED) |
+| `POST` | `/api/loans/investments` | `InvestRequest` | `200` + `LoanResponse` | Invest (→ INVESTED when fully funded) |
+| `PATCH` | `/api/loans/investments/receive` | `ReceiveFundsRequest` | `204` | Confirm funds received |
+| `PATCH` | `/api/loans/disburse` | `DisburseRequest` | `200` + `LoanResponse` | Disburse (→ DISBURSED) |
+| `GET` | `/api/loans/agreement/{id}` | — | `200` + HTML | View agreement letter |
+| `GET` | `/api/loans/notifications/{id}` | — | `200` + `[NotificationResponse]` | Query email send status |
+| `POST` | `/api/investors` | `CreateInvestorRequest` | `201` | Register investor profile |
 
-**Create loan:**
-```
-POST /api/loans
-{ "borrowerId": 1001, "borrowerName": "Zhang Wei", "principalAmount": 500000,
-  "interestRate": 10.00, "roi": 8.00, "currency": "USD" }
+### Request Bodies
+
+**Create loan** — `POST /api/loans`
+```json
+{
+  "borrowerId": 1001,
+  "borrowerName": "Zhang Wei",
+  "principalAmount": 500000,
+  "interestRate": 10.00,
+  "roi": 8.00,
+  "currency": "USD"
+}
 ```
 
-**Approve:**
-```
-PATCH /api/loans/{id}/approve
-{ "validatorEmployeeId": 2001, "validatorEmployeeName": "Chen Jie",
+**Approve** — `PATCH /api/loans/approve`
+```json
+{
+  "loanId": 1,
+  "validatorEmployeeId": 2001,
+  "validatorEmployeeName": "Chen Jie",
   "approvalDatetime": "2026-07-27T12:00:00+08:00",
-  "validatorPhotoUrls": ["https://storage.example.com/photo.jpg"] }
+  "validatorPhotoUrls": ["https://storage.example.com/photo.jpg"]
+}
 ```
 
-**Invest:**
-```
-POST /api/loans/{id}/investments
-{ "investorId": 3001, "investorName": "Alice", "amount": 300000,
-  "currency": "USD", "datetime": "2026-07-27T12:00:00+08:00",
-  "fundStatus": "RECEIVED" }
-```
-
-**Disburse:**
-```
-PATCH /api/loans/{id}/disburse
-{ "signedAgreementUrl": "https://storage.example.com/agreement.pdf",
-  "fieldOfficerEmployeeId": 4001, "fieldOfficerEmployeeName": "Liu Yang",
-  "disbursementDatetime": "2026-08-01T12:00:00+08:00" }
+**Invest** — `POST /api/loans/investments`
+```json
+{
+  "loanId": 1,
+  "investorId": 3001,
+  "investorName": "Alice",
+  "amount": 300000,
+  "currency": "USD",
+  "datetime": "2026-07-27T12:00:00+08:00",
+  "fundStatus": "RECEIVED"
+}
 ```
 
-**Create investor:**
-```
-POST /api/investors
-{ "investorId": 3001, "name": "Alice Wang",
-  "emailUrl": "alice@example.com", "registerDate": "2025-01-15" }
-```
-
-**View agreement letter (browser):**
-```
-GET /api/loans/{id}/agreement
+**Confirm funds** — `PATCH /api/loans/investments/receive`
+```json
+{
+  "loanId": 1,
+  "investmentId": 5
+}
 ```
 
-**Query notification status:**
-```
-GET /api/loans/{id}/notifications
-→ [{ "id": 1, "investorId": 3001, "recipientEmail": "alice@example.com",
-     "status": "SENT", "agreementUrl": "...", "sentDatetime": "...", "retryCount": 0 }]
+**Disburse** — `PATCH /api/loans/disburse`
+```json
+{
+  "loanId": 1,
+  "signedAgreementUrl": "https://storage.example.com/agreement.pdf",
+  "fieldOfficerEmployeeId": 4001,
+  "fieldOfficerEmployeeName": "Liu Yang",
+  "disbursementDatetime": "2026-08-01T12:00:00+08:00"
+}
 ```
 
-### Error Response Format
+**Create investor** — `POST /api/investors`
+```json
+{
+  "investorId": 3001,
+  "name": "Alice Wang",
+  "emailUrl": "alice@example.com",
+  "registerDate": "2025-01-15"
+}
+```
+
+### Response Examples
+
+**LoanResponse** — `GET /api/loans/{id}` / `POST /api/loans` / approve / invest / disburse
+```json
+{
+  "id": 1,
+  "borrowerId": 1001,
+  "borrowerName": "Zhang Wei",
+  "principalAmount": 500000,
+  "interestRate": 10.00,
+  "roi": 8.00,
+  "currency": "USD",
+  "currState": "INVESTED",
+  "initDatetime": "2026-07-27T12:00:00+08:00",
+  "agreeLetterUrl": "http://localhost:8080/api/loans/agreement/1",
+  "agreeLetterSendDatetime": "2026-07-28T12:00:00+08:00",
+  "fundsReceivedDatetime": "2026-07-28T13:00:00+08:00",
+  "approval": {
+    "validatorEmployeeId": 2001,
+    "validatorEmployeeName": "Chen Jie",
+    "approvalDatetime": "2026-07-27T12:00:00+08:00",
+    "validatorPhotoUrls": ["https://storage.example.com/photo.jpg"]
+  },
+  "investments": [
+    {
+      "id": 1,
+      "investorId": 3001,
+      "investorName": "Alice",
+      "amount": 300000,
+      "currency": "USD",
+      "datetime": "2026-07-27T13:00:00+08:00",
+      "fundStatus": "RECEIVED"
+    },
+    {
+      "id": 2,
+      "investorId": 3002,
+      "investorName": "Bob",
+      "amount": 200000,
+      "currency": "USD",
+      "datetime": "2026-07-27T13:05:00+08:00",
+      "fundStatus": "RECEIVED"
+    }
+  ],
+  "disbursement": null
+}
+```
+
+**NotificationResponse[]** — `GET /api/loans/notifications/{id}`
+```json
+[
+  {
+    "id": 1,
+    "investorId": 3001,
+    "recipientEmail": "alice@example.com",
+    "status": "SENT",
+    "agreementUrl": "http://localhost:8080/api/loans/agreement/1",
+    "sentDatetime": "2026-07-28T12:00:01+08:00",
+    "errorMessage": null,
+    "retryCount": 0
+  },
+  {
+    "id": 2,
+    "investorId": 3002,
+    "recipientEmail": "bob@example.com",
+    "status": "SENT",
+    "agreementUrl": "http://localhost:8080/api/loans/agreement/1",
+    "sentDatetime": "2026-07-28T12:00:02+08:00",
+    "errorMessage": null,
+    "retryCount": 0
+  }
+]
+```
+
+### Error Responses
 
 ```json
-{ "code": "STATE_CONFLICT", "message": "...", "timestamp": "..." }
+{ "code": "STATE_CONFLICT", "message": "Cannot invest a loan in DISBURSED state (id=1)", "timestamp": "2026-07-28T12:00:00+08:00" }
 ```
 
 | HTTP | Code | Meaning |
 |------|------|---------|
 | 400 | `BAD_REQUEST` | Missing/invalid params, loan not found |
-| 400 | `VALIDATION` | `@Valid` constraint violation |
+| 400 | `VALIDATION` | Jakarta `@Valid` constraint violation |
 | 409 | `STATE_CONFLICT` | Illegal state transition |
 | 500 | `INTERNAL` | Unexpected error |
 
@@ -198,12 +329,12 @@ GET /api/loans/{id}/notifications
 ## Database
 
 - **H2** file-based, MySQL compatibility mode
-- **TCP server** on port 9092
+- **TCP server** on port 9092 (shared by app + browser console)
 - **8 tables**: `loans`, `approvals`, `approval_photos`, `investments`, `disbursements`, `investors`, `notification_outbox`
-- No foreign key constraints (by design)
+- No foreign key constraints (by design — portable across DB engines)
 - Indexes on all FK columns + `loans.curr_state` + `loans.borrower_id` + `notification_outbox.status`
 - Schema: `src/main/resources/schema.sql`
-- Test data: `src/main/resources/test_data.sql`
+- Test data (auto-executed): `src/main/resources/test_data.sql`
 
 ### H2 Console
 
@@ -214,9 +345,9 @@ GET /api/loans/{id}/notifications
 ## Email Notification
 
 - **Interface**: `EmailService` — decouples notification from delivery mechanism
-- **Mock**: `MockEmailServiceImpl` — writes to `email.log` (configurable via `app.notification.email-log-path`)
+- **Mock**: `MockEmailServiceImpl` — writes to `logs/email.log` (configurable via `app.notification.email-log-path`)
 - **Outbox**: `notification_outbox` table tracks every email: `PENDING → SENT / FAILED`
-- **Async**: `@EventListener` + `@Async` on `InvestorNotificationListener`, thread pool `notif-*` (2–5 threads, `LinkedBlockingQueue(50)`)
+- **Async**: `@EventListener` + `@Async` on `InvestorNotificationListener`, thread pool `notif-*` (2–5 threads, `LinkedBlockingQueue(50)`, `CallerRunsPolicy`)
 - **Retry**: `NotificationRetryScheduler` runs every 5 minutes, retries FAILED records (up to 3 attempts)
 - **Decoupled**: email failure does NOT affect loan state — `LoanService` only publishes `LoanFullyInvestedEvent`
 
@@ -224,16 +355,18 @@ GET /api/loans/{id}/notifications
 
 ## Testing
 
-- **43 pure JUnit 5 tests** — no Spring container, millisecond-level
-- **6 test classes**:
+- **48 tests** — 43 pure JUnit 5 + 5 integration/unit (MockEmailServiceImpl, NotificationIntegration)
+- **8 test classes**:
 
 | Class | Cases | What it covers |
 |-------|-------|----------------|
-| `LoanStateHandlerTest` | 29 | State transitions, validation rules (currency match, file type), edge cases |
+| `LoanStateHandlerTest` | 29 | State transitions, validation (currency match, file type), edge cases |
 | `NotificationOutboxTest` | 4 | Entity state machine: createPending, markSent, markFailed, equality |
 | `AgreementServiceTest` | 2 | URL generation, Thymeleaf template delegation |
 | `LoanServiceTest` | 4 | investLoan orchestration: partial, fullyFunded → URL+event, notFound |
 | `InvestorNotificationListenerTest` | 4 | Event handling: each-investor email, skip-no-email, fail→markFailed, outbox fields |
+| `MockEmailServiceImplTest` | 3 | email.log write format, append, parent-dir creation |
+| `NotificationIntegrationTest` | 2 | End-to-end: investor → outbox → email.log → DB status; FAILED retry eligibility |
 
 - Run: `mvn test`
 
@@ -244,7 +377,7 @@ GET /api/loans/{id}/notifications
 - **Log4j2** (`log4j2-spring.xml`)
 - `logs/app.log` — INFO+ for `org.example.amartha` (business audit trail)
 - `logs/error.log` — WARN+ for all packages
-- `email.log` — mock email delivery log (ISO 8601 timestamps + recipient details)
+- `logs/email.log` — mock email delivery log (ISO 8601 timestamps + recipient details)
 
 ---
 
@@ -263,3 +396,11 @@ GET /api/loans/{id}/notifications
 | Boilerplate | Lombok |
 | Validation | Jakarta Validation |
 | Testing | JUnit 5 + Mockito |
+
+---
+
+## How to Run & Test
+
+See **[SMOKE_TEST.md](SMOKE_TEST.md)** for:
+- Prerequisites and startup commands (`mvn test`, H2 TCP, `mvn spring-boot:run`)
+- 25 curl-based smoke tests covering the full lifecycle, state machine rules, and business logic validations
