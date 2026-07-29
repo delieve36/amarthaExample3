@@ -87,6 +87,7 @@ Schema and test data are loaded automatically on first run.
 |------|----|-------|---------|
 | Loan | 1 | PROPOSED | borrower Zhang Wei, $5,000, 10% rate, 8% ROI |
 | Loan | 100 | APPROVED | borrower Li Ming, $10,000, 12.5% rate, 9% ROI |
+| Loan | 200 | DISBURSED | borrower Wang Fang, $5,000, 9% rate, 7% ROI, Alice $3k + Bob $2k |
 | Investor | 3001 | — | Alice Wang, alice@example.com |
 | Investor | 3002 | — | Bob Chen, bob@example.com |
 | Investor | 3003 | — | Carol Liu, carol@example.com |
