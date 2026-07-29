@@ -444,6 +444,210 @@ fi
 *Expected: `HTTP 400` — `"Investment not found or does not belong to loan"` — cross-loan fund marking is rejected.*
 
 ---
+## E. Complex Scenario — Multi-Borrower × Multi-Bank Cross-Investment
+
+```
+Participants:
+  Bank1 = investor 3001 (Alice)    Bank2 = investor 3002 (Bob)    Bank3 = investor 3003 (Carol)
+
+Borrower A — Loan $10,000:                    Borrower B — Loan $8,000:
+  Bank1: $3,000 + $2,000  (2笔)                Bank1: $2,000              (1笔)
+  Bank2: $3,000            (1笔)                Bank2: $2,000+$1,000+$1,000 (3笔!)
+  Bank3: $2,000            (1笔)                Bank3: $2,000              (1笔)
+  ─────────────────────────────                 ─────────────────────────────
+  Total: $10,000 → INVESTED                    Total: $8,000 → INVESTED
+
+Funds received:
+  Loan A: Bank1(2笔)✓ + Bank2✓ + Bank3✗ → fundsReceivedDatetime NOT set
+  Loan B: ALL ✓ → fundsReceivedDatetime set
+```
+
+### E1. Create and approve both loans
+
+```bash
+# Borrower A: $10,000
+LOAN_A=$(curl -s -X POST $BASE/api/loans \
+  -H 'Content-Type: application/json' \
+  -d '{"borrowerId": 8001, "borrowerName": "Borrower A", "principalAmount": 10000, "interestRate": 8.0, "roi": 6.0, "currency": "USD"}' | jq -r .id)
+echo "Loan A: $LOAN_A"
+
+# Borrower B: $8,000
+LOAN_B=$(curl -s -X POST $BASE/api/loans \
+  -H 'Content-Type: application/json' \
+  -d '{"borrowerId": 8002, "borrowerName": "Borrower B", "principalAmount": 8000, "interestRate": 7.5, "roi": 5.5, "currency": "USD"}' | jq -r .id)
+echo "Loan B: $LOAN_B"
+
+# Approve both
+curl -s -X PATCH $BASE/api/loans/approve \
+  -H 'Content-Type: application/json' \
+  -d "{\"loanId\": $LOAN_A, \"validatorEmployeeId\": 2001, \"approvalDatetime\": \"2026-07-29T09:00:00+08:00\", \"validatorPhotoUrls\": [\"https://example.com/photo-a.jpg\"]}" > /dev/null
+
+curl -s -X PATCH $BASE/api/loans/approve \
+  -H 'Content-Type: application/json' \
+  -d "{\"loanId\": $LOAN_B, \"validatorEmployeeId\": 2001, \"approvalDatetime\": \"2026-07-29T09:05:00+08:00\", \"validatorPhotoUrls\": [\"https://example.com/photo-b.jpg\"]}" > /dev/null
+
+echo "Both loans APPROVED"
+```
+
+### E2. Invest — Loan A (4 investments from 3 banks)
+
+```bash
+# Bank1 #1: $3,000
+curl -s -X POST $BASE/api/loans/investments \
+  -H 'Content-Type: application/json' \
+  -d "{\"loanId\": $LOAN_A, \"investorId\": 3001, \"investorName\": \"Bank1\", \"amount\": 3000, \"currency\": \"USD\", \"datetime\": \"2026-07-29T09:10:00+08:00\"}" | jq .currState
+# → APPROVED (3000/10000)
+
+# Bank1 #2: $2,000
+curl -s -X POST $BASE/api/loans/investments \
+  -H 'Content-Type: application/json' \
+  -d "{\"loanId\": $LOAN_A, \"investorId\": 3001, \"investorName\": \"Bank1\", \"amount\": 2000, \"currency\": \"USD\", \"datetime\": \"2026-07-29T09:11:00+08:00\"}" | jq .currState
+# → APPROVED (5000/10000)
+
+# Bank2: $3,000
+curl -s -X POST $BASE/api/loans/investments \
+  -H 'Content-Type: application/json' \
+  -d "{\"loanId\": $LOAN_A, \"investorId\": 3002, \"investorName\": \"Bank2\", \"amount\": 3000, \"currency\": \"USD\", \"datetime\": \"2026-07-29T09:12:00+08:00\"}" | jq .currState
+# → APPROVED (8000/10000)
+
+# Bank3: $2,000 → triggers INVESTED
+curl -s -X POST $BASE/api/loans/investments \
+  -H 'Content-Type: application/json' \
+  -d "{\"loanId\": $LOAN_A, \"investorId\": 3003, \"investorName\": \"Bank3\", \"amount\": 2000, \"currency\": \"USD\", \"datetime\": \"2026-07-29T09:13:00+08:00\"}" | jq '{currState, agreeLetterUrl, investmentsCount: (.investments | length)}'
+```
+
+*Expected: `currState: "INVESTED"`, `agreeLetterUrl` populated, `investmentsCount: 4`.*
+
+### E3. Invest — Loan B (5 investments from 3 banks, Bank2 does 3)
+
+```bash
+# Bank1: $2,000
+curl -s -X POST $BASE/api/loans/investments \
+  -H 'Content-Type: application/json' \
+  -d "{\"loanId\": $LOAN_B, \"investorId\": 3001, \"investorName\": \"Bank1\", \"amount\": 2000, \"currency\": \"USD\", \"datetime\": \"2026-07-29T09:14:00+08:00\"}" | jq .currState
+# → APPROVED (2000/8000)
+
+# Bank2 #1: $2,000
+curl -s -X POST $BASE/api/loans/investments \
+  -H 'Content-Type: application/json' \
+  -d "{\"loanId\": $LOAN_B, \"investorId\": 3002, \"investorName\": \"Bank2\", \"amount\": 2000, \"currency\": \"USD\", \"datetime\": \"2026-07-29T09:15:00+08:00\"}" | jq .currState
+# → APPROVED (4000/8000)
+
+# Bank2 #2: $1,000
+curl -s -X POST $BASE/api/loans/investments \
+  -H 'Content-Type: application/json' \
+  -d "{\"loanId\": $LOAN_B, \"investorId\": 3002, \"investorName\": \"Bank2\", \"amount\": 1000, \"currency\": \"USD\", \"datetime\": \"2026-07-29T09:16:00+08:00\"}" | jq .currState
+# → APPROVED (5000/8000)
+
+# Bank2 #3: $1,000
+curl -s -X POST $BASE/api/loans/investments \
+  -H 'Content-Type: application/json' \
+  -d "{\"loanId\": $LOAN_B, \"investorId\": 3002, \"investorName\": \"Bank2\", \"amount\": 1000, \"currency\": \"USD\", \"datetime\": \"2026-07-29T09:17:00+08:00\"}" | jq .currState
+# → APPROVED (6000/8000)
+
+# Bank3: $2,000 → triggers INVESTED
+curl -s -X POST $BASE/api/loans/investments \
+  -H 'Content-Type: application/json' \
+  -d "{\"loanId\": $LOAN_B, \"investorId\": 3003, \"investorName\": \"Bank3\", \"amount\": 2000, \"currency\": \"USD\", \"datetime\": \"2026-07-29T09:18:00+08:00\"}" | jq '{currState, agreeLetterUrl, investmentsCount: (.investments | length)}'
+```
+
+*Expected: `currState: "INVESTED"`, `agreeLetterUrl` populated, `investmentsCount: 5`.*
+
+### E4. Confirm funds — Loan A: Bank1 (both) + Bank2 received, Bank3 NOT received
+
+```bash
+# Fetch Loan A investment IDs
+echo "Loan A investments:"
+curl -s $BASE/api/loans/$LOAN_A | jq '.investments[] | {id, investorName, amount, fundStatus}'
+
+# Bank1 investments → both RECEIVED
+INV_A1=$(curl -s $BASE/api/loans/$LOAN_A | jq '.investments[] | select(.investorName=="Bank1" and .amount==3000) | .id')
+INV_A2=$(curl -s $BASE/api/loans/$LOAN_A | jq '.investments[] | select(.investorName=="Bank1" and .amount==2000) | .id')
+# Bank2 investment → RECEIVED
+INV_A3=$(curl -s $BASE/api/loans/$LOAN_A | jq '.investments[] | select(.investorName=="Bank2") | .id')
+# Bank3 investment → NOT received (skip marking it)
+
+curl -s -X PATCH $BASE/api/loans/investments/receive \
+  -H 'Content-Type: application/json' \
+  -d "{\"loanId\": $LOAN_A, \"investmentId\": $INV_A1}" -w "Bank1-$3000: HTTP %{http_code}\n"
+curl -s -X PATCH $BASE/api/loans/investments/receive \
+  -H 'Content-Type: application/json' \
+  -d "{\"loanId\": $LOAN_A, \"investmentId\": $INV_A2}" -w "Bank1-$2000: HTTP %{http_code}\n"
+curl -s -X PATCH $BASE/api/loans/investments/receive \
+  -H 'Content-Type: application/json' \
+  -d "{\"loanId\": $LOAN_A, \"investmentId\": $INV_A3}" -w "Bank2:      HTTP %{http_code}\n"
+```
+
+*Expected: all `HTTP 204`.*
+
+### E5. Confirm funds — Loan B: ALL received
+
+```bash
+# Fetch Loan B investment IDs and mark ALL as received
+INV_B_IDS=$(curl -s $BASE/api/loans/$LOAN_B | jq -r '.investments[].id')
+for id in $INV_B_IDS; do
+  curl -s -X PATCH $BASE/api/loans/investments/receive \
+    -H 'Content-Type: application/json' \
+    -d "{\"loanId\": $LOAN_B, \"investmentId\": $id}" -w "Inv#$id: HTTP %{http_code}\n"
+done
+```
+
+*Expected: all `HTTP 204`.*
+
+### E6. Verify Loan A — INVESTED, fundsReceivedDatetime NOT set (Bank3 unpaid)
+
+```bash
+curl -s $BASE/api/loans/$LOAN_A | jq '{
+  currState,
+  fundsReceivedDatetime,
+  agreeLetterUrl,
+  investmentSummary: [.investments[]? | {name: .investorName, amount, fundStatus}]
+}'
+```
+
+*Expected: `currState: "INVESTED"`, `fundsReceivedDatetime: null` (Bank3 is still PENDING), `agreeLetterUrl` populated.*
+
+### E7. Verify Loan B — INVESTED, fundsReceivedDatetime IS set (all paid)
+
+```bash
+curl -s $BASE/api/loans/$LOAN_B | jq '{
+  currState,
+  fundsReceivedDatetime,
+  agreeLetterUrl,
+  investmentSummary: [.investments[]? | {name: .investorName, amount, fundStatus}]
+}'
+```
+
+*Expected: `currState: "INVESTED"`, `fundsReceivedDatetime` populated (not null), all `fundStatus: "RECEIVED"`.*
+
+### E8. Verify outbox — both loans have notification records
+
+```bash
+echo "=== Loan A notifications ==="
+curl -s $BASE/api/loans/notifications/$LOAN_A | jq '[.[] | {investorId, status, recipientEmail}]'
+
+echo "=== Loan B notifications ==="
+curl -s $BASE/api/loans/notifications/$LOAN_B | jq '[.[] | {investorId, status, recipientEmail}]'
+```
+
+*Expected: each loan has 3 notification records (one per unique investor), all `status: "SENT"`.*
+
+### E9. Cross-loan guard — mark Loan B's investment with Loan A's ID
+
+```bash
+# Pick any investment from Loan B
+INV_B1=$(curl -s $BASE/api/loans/$LOAN_B | jq -r '.investments[0].id')
+
+# Try to mark it as received under Loan A
+curl -s -X PATCH $BASE/api/loans/investments/receive \
+  -H 'Content-Type: application/json' \
+  -d "{\"loanId\": $LOAN_A, \"investmentId\": $INV_B1}" \
+  -w "\nHTTP %{http_code}\n"
+```
+
+*Expected: `HTTP 400` — `"Investment not found or does not belong to loan"`.*
+
+---
 
 ## Troubleshooting
 
