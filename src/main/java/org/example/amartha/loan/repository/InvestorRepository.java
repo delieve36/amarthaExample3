@@ -48,6 +48,7 @@ public class InvestorRepository {
         if (key == null) {
             throw new IllegalStateException("Failed to retrieve generated investor ID");
         }
+        investor.setId(key.longValue());
         log.info("Investor saved: id={} investorId={} name={}",
             key.longValue(), investor.getInvestorId(), investor.getName());
         return investor;

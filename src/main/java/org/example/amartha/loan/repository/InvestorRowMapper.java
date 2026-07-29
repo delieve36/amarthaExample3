@@ -14,6 +14,7 @@ public class InvestorRowMapper implements RowMapper<Investor> {
     @Override
     public Investor mapRow(ResultSet rs, int rowNum) throws SQLException {
         Investor investor = new Investor();
+        investor.setId(rs.getLong("id"));
         investor.setInvestorId(rs.getLong("investor_id"));
         investor.setName(rs.getString("name"));
         investor.setEmailUrl(rs.getString("email_url"));

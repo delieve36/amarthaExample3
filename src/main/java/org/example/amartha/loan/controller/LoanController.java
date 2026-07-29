@@ -57,7 +57,8 @@ public class LoanController {
         investment.setAmount(req.getAmount());
         investment.setCurrency(req.getCurrency());
         investment.setDatetime(req.getDatetime());
-        investment.setFundStatus(req.getFundStatus() != null ? req.getFundStatus() : FundStatus.PENDING);
+        // Always PENDING on creation — funds must be confirmed via receiveFunds
+        investment.setFundStatus(FundStatus.PENDING);
 
         Loan loan = loanService.investLoan(req.getLoanId(), investment);
         return ResponseEntity.ok(LoanResponse.from(loan));

@@ -218,9 +218,9 @@ public class LoanRepository {
     }
 
     @Transactional
-    public void updateInvestmentFundStatus(Long investmentId, FundStatus status) {
-        String sql = "UPDATE investments SET fund_status = ?, gmt_modify = ? WHERE id = ?";
-        jdbc.update(sql, status.name(), Timestamp.valueOf(LocalDateTime.now()), investmentId);
+    public int updateInvestmentFundStatus(Long investmentId, Long loanId, FundStatus status) {
+        String sql = "UPDATE investments SET fund_status = ?, gmt_modify = ? WHERE id = ? AND loan_id = ?";
+        return jdbc.update(sql, status.name(), Timestamp.valueOf(LocalDateTime.now()), investmentId, loanId);
     }
 
     @Transactional
@@ -275,12 +275,23 @@ public class LoanRepository {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """;
         LocalDateTime now = LocalDateTime.now();
-        jdbc.update(sql,
-            Timestamp.valueOf(now), Timestamp.valueOf(now),
-            disbursement.getLoanId(), disbursement.getSignedAgreementUrl(),
-            disbursement.getFieldOfficerEmployeeId(),
-            disbursement.getFieldOfficerEmployeeName(),
-            disbursement.getDisbursementDatetime(), disbursement.isDisbursed());
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbc.update(connection -> {
+            PreparedStatement ps = connection.prepareStatement(sql, new String[]{"id"});
+            ps.setTimestamp(1, Timestamp.valueOf(now));
+            ps.setTimestamp(2, Timestamp.valueOf(now));
+            ps.setLong(3, disbursement.getLoanId());
+            ps.setString(4, disbursement.getSignedAgreementUrl());
+            ps.setLong(5, disbursement.getFieldOfficerEmployeeId());
+            ps.setString(6, disbursement.getFieldOfficerEmployeeName());
+            ps.setObject(7, disbursement.getDisbursementDatetime());
+            ps.setBoolean(8, disbursement.isDisbursed());
+            return ps;
+        }, keyHolder);
+        Number key = keyHolder.getKey();
+        if (key != null) {
+            disbursement.setId(key.longValue());
+        }
         disbursement.setGmtCreate(now);
         disbursement.setGmtModify(now);
     }

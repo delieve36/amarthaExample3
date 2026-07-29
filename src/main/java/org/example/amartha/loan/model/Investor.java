@@ -20,6 +20,9 @@ import java.time.LocalDate;
 @EqualsAndHashCode
 public class Investor {
 
+    /** 数据库自增主键 */
+    private Long id;
+
     /** 投资者唯一标识 */
     private Long investorId;
 
