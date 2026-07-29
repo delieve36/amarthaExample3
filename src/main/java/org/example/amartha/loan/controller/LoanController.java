@@ -35,55 +35,52 @@ public class LoanController {
         return ResponseEntity.ok(LoanResponse.from(loan));
     }
 
-    @PatchMapping("/{id}/approve")
-    public ResponseEntity<LoanResponse> approveLoan(@PathVariable Long id,
-                                                     @Valid @RequestBody ApproveLoanRequest req) {
-        log.info("PATCH /api/loans/{}/approve — {}", id, req);
+    @PatchMapping("/approve")
+    public ResponseEntity<LoanResponse> approveLoan(@Valid @RequestBody ApproveLoanRequest req) {
+        log.info("PATCH /api/loans/approve — {}", req);
         Approval approval = new Approval();
         approval.setValidatorEmployeeId(req.getValidatorEmployeeId());
         approval.setValidatorEmployeeName(req.getValidatorEmployeeName());
         approval.setApprovalDatetime(req.getApprovalDatetime());
         approval.setValidatorPhotoUrls(req.getValidatorPhotoUrls());
 
-        Loan loan = loanService.approveLoan(id, approval);
+        Loan loan = loanService.approveLoan(req.getLoanId(), approval);
         return ResponseEntity.ok(LoanResponse.from(loan));
     }
 
-    @PostMapping("/{id}/investments")
-    public ResponseEntity<LoanResponse> invest(@PathVariable Long id,
-                                                @Valid @RequestBody InvestRequest req) {
-        log.info("POST /api/loans/{}/investments — {}", id, req);
+    @PostMapping("/investments")
+    public ResponseEntity<LoanResponse> invest(@Valid @RequestBody InvestRequest req) {
+        log.info("POST /api/loans/investments — {}", req);
         Investment investment = new Investment();
         investment.setInvestorId(req.getInvestorId());
         investment.setInvestorName(req.getInvestorName());
         investment.setAmount(req.getAmount());
         investment.setCurrency(req.getCurrency());
         investment.setDatetime(req.getDatetime());
-        investment.setFundStatus(req.getFundStatus() != null ? req.getFundStatus() : FundStatus.PENDING);
+        // Always PENDING on creation — funds must be confirmed via receiveFunds
+        investment.setFundStatus(FundStatus.PENDING);
 
-        Loan loan = loanService.investLoan(id, investment);
+        Loan loan = loanService.investLoan(req.getLoanId(), investment);
         return ResponseEntity.ok(LoanResponse.from(loan));
     }
 
-    @PatchMapping("/{loanId}/investments/{investmentId}/receive")
-    public ResponseEntity<Void> receiveFunds(@PathVariable Long loanId,
-                                              @PathVariable Long investmentId) {
-        log.info("PATCH /api/loans/{}/investments/{}/receive", loanId, investmentId);
-        loanService.receiveFunds(loanId, investmentId);
+    @PatchMapping("/investments/receive")
+    public ResponseEntity<Void> receiveFunds(@Valid @RequestBody ReceiveFundsRequest req) {
+        log.info("PATCH /api/loans/investments/receive — {}", req);
+        loanService.receiveFunds(req.getLoanId(), req.getInvestmentId());
         return ResponseEntity.noContent().build();
     }
 
-    @PatchMapping("/{id}/disburse")
-    public ResponseEntity<LoanResponse> disburse(@PathVariable Long id,
-                                                  @Valid @RequestBody DisburseRequest req) {
-        log.info("PATCH /api/loans/{}/disburse — {}", id, req);
+    @PatchMapping("/disburse")
+    public ResponseEntity<LoanResponse> disburse(@Valid @RequestBody DisburseRequest req) {
+        log.info("PATCH /api/loans/disburse — {}", req);
         Disbursement disbursement = new Disbursement();
         disbursement.setSignedAgreementUrl(req.getSignedAgreementUrl());
         disbursement.setFieldOfficerEmployeeId(req.getFieldOfficerEmployeeId());
         disbursement.setFieldOfficerEmployeeName(req.getFieldOfficerEmployeeName());
         disbursement.setDisbursementDatetime(req.getDisbursementDatetime());
 
-        Loan loan = loanService.disburseLoan(id, disbursement);
+        Loan loan = loanService.disburseLoan(req.getLoanId(), disbursement);
         return ResponseEntity.ok(LoanResponse.from(loan));
     }
 }

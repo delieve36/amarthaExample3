@@ -19,6 +19,10 @@ import java.time.OffsetDateTime;
 @ToString
 public class DisburseRequest {
 
+    @NotNull(message = "loanId is required")
+    @Positive(message = "loanId must be positive")
+    private Long loanId;
+
     @NotBlank(message = "signedAgreementUrl is required")
     @Size(max = 2000, message = "signedAgreementUrl exceeds 2000 characters")
     private String signedAgreementUrl;

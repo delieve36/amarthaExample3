@@ -20,4 +20,4 @@ app:
   agreement:
     base-url: ${AGREEMENT_BASE_URL:http://localhost:8080}
   notification:
-    email-log-path: ${EMAIL_LOG_PATH:email.log}
+    email-log-path: ${EMAIL_LOG_PATH:logs/email.log}

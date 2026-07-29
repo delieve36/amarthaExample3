@@ -11,14 +11,14 @@ class NotificationOutboxTest {
     @Test
     @DisplayName("createPending → PENDING with correct fields")
     void createPending_shouldSetCorrectFields() {
-        var outbox = NotificationOutbox.createPending(100L, 3001L, "alice@example.com", "http://localhost:8080/api/loans/100/agreement");
+        var outbox = NotificationOutbox.createPending(100L, 3001L, "alice@example.com", "http://localhost:8080/api/loans/agreement/100");
 
         assertEquals(100L, outbox.getLoanId());
         assertEquals(3001L, outbox.getInvestorId());
         assertEquals("alice@example.com", outbox.getRecipientEmail());
         assertEquals(NotificationType.AGREEMENT_LETTER, outbox.getType());
         assertEquals(NotificationStatus.PENDING, outbox.getStatus());
-        assertEquals("http://localhost:8080/api/loans/100/agreement", outbox.getAgreementUrl());
+        assertEquals("http://localhost:8080/api/loans/agreement/100", outbox.getAgreementUrl());
         assertEquals(0, outbox.getRetryCount());
     }
 

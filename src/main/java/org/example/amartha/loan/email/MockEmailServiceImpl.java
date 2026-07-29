@@ -34,10 +34,18 @@ public class MockEmailServiceImpl implements EmailService {
         log.info("MockEmailService initialized — emails will be written to {}", this.logPath);
     }
 
+    /**
+     * Strip CR/LF to prevent log-forgery via user-controlled fields.
+     */
+    private static String sanitize(String s) {
+        if (s == null) return "null";
+        return s.replace("\r", "\\r").replace("\n", "\\n");
+    }
+
     @Override
     public void sendAgreementEmail(String to, String investorName, Long loanId, String agreementUrl) {
         String entry = String.format("[%s] TO=%s | INVESTOR=%s | LOAN=%d | AGREEMENT=%s%n",
-            FMT.format(OffsetDateTime.now()), to, investorName, loanId, agreementUrl);
+            FMT.format(OffsetDateTime.now()), sanitize(to), sanitize(investorName), loanId, agreementUrl);
 
         try {
             Files.createDirectories(logPath.getParent());

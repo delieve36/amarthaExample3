@@ -21,6 +21,10 @@ import org.example.amartha.loan.model.FundStatus;
 @ToString
 public class InvestRequest {
 
+    @NotNull(message = "loanId is required")
+    @Positive(message = "loanId must be positive")
+    private Long loanId;
+
     @NotNull(message = "investorId is required")
     @Positive(message = "investorId must be positive")
     private Long investorId;

@@ -1,6 +1,7 @@
 package org.example.amartha.loan.controller;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -34,6 +35,12 @@ public class GlobalExceptionHandler {
             .orElse("Validation failed");
         log.warn("Validation failed: {}", msg);
         return ResponseEntity.badRequest().body(error("VALIDATION", msg));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, Object>> handleDataIntegrity(DataIntegrityViolationException ex) {
+        log.warn("Data integrity violation: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(error("DATA_CONFLICT", "Resource already exists or violates a unique constraint"));
     }
 
     @ExceptionHandler(Exception.class)

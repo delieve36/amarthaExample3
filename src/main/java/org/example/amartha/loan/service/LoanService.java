@@ -60,7 +60,7 @@ public class LoanService {
     // ========================================================================
 
     public Loan approveLoan(Long loanId, Approval approval) {
-        Loan loan = loanRepository.findById(loanId)
+        Loan loan = loanRepository.findByIdForUpdate(loanId)
             .orElseThrow(() -> new IllegalArgumentException("Loan not found: " + loanId));
 
         LoanStateHandler handler = LoanStateHandler.forState(loan.getCurrState());
@@ -111,7 +111,7 @@ public class LoanService {
     }
 
     public Loan disburseLoan(Long loanId, Disbursement disbursement) {
-        Loan loan = loanRepository.findById(loanId)
+        Loan loan = loanRepository.findByIdForUpdate(loanId)
             .orElseThrow(() -> new IllegalArgumentException("Loan not found: " + loanId));
 
         LoanStateHandler handler = LoanStateHandler.forState(loan.getCurrState());
@@ -126,10 +126,14 @@ public class LoanService {
 
     @Transactional
     public void receiveFunds(Long loanId, Long investmentId) {
-        loanRepository.updateInvestmentFundStatus(investmentId, FundStatus.RECEIVED);
+        int rows = loanRepository.updateInvestmentFundStatus(investmentId, loanId, FundStatus.RECEIVED);
+        if (rows == 0) {
+            throw new IllegalArgumentException(
+                "Investment not found or does not belong to loan: investmentId=" + investmentId + " loanId=" + loanId);
+        }
         log.info("Investment {} funds marked as RECEIVED", investmentId);
 
-        Loan loan = loanRepository.findById(loanId)
+        Loan loan = loanRepository.findByIdForUpdate(loanId)
             .orElseThrow(() -> new IllegalArgumentException("Loan not found: " + loanId));
 
         // guard: only set once to avoid race on concurrent receiveFunds calls
