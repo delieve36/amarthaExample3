@@ -8,8 +8,9 @@ import org.example.amartha.loan.model.Investor;
 import org.example.amartha.loan.model.NotificationOutbox;
 import org.example.amartha.loan.repository.InvestorRepository;
 import org.example.amartha.loan.repository.NotificationOutboxRepository;
-import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -42,7 +43,7 @@ public class InvestorNotificationListener {
     }
 
     @Async
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onLoanFullyInvested(LoanFullyInvestedEvent event) {
         var loan = event.loan();
         log.info("Received LoanFullyInvestedEvent — loan={} investors={}",

@@ -347,7 +347,7 @@ See source: `org.example.amartha.loan.model.*`.
 - **Interface**: `EmailService` — decouples notification from delivery mechanism
 - **Mock**: `MockEmailServiceImpl` — writes to `logs/email.log` (configurable via `app.notification.email-log-path`)
 - **Outbox**: `notification_outbox` table tracks every email: `PENDING → SENT / FAILED`
-- **Async**: `@EventListener` + `@Async` on `InvestorNotificationListener`, thread pool `notif-*` (2–5 threads, `LinkedBlockingQueue(50)`, discard-on-overflow — rejected tasks are logged and dropped to avoid blocking the main loan flow)
+- **Async**: `@TransactionalEventListener(AFTER_COMMIT)` + `@Async` on `InvestorNotificationListener`, thread pool `notif-*` (2–5 threads, `LinkedBlockingQueue(50)`, discard-on-overflow — rejected tasks are logged and dropped to avoid blocking the main loan flow)
 - **Retry**: `NotificationRetryScheduler` runs every 5 minutes, retries FAILED records (up to 3 attempts)
 - **Decoupled**: email failure does NOT affect loan state — `LoanService` only publishes `LoanFullyInvestedEvent`
 
