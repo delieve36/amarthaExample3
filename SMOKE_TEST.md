@@ -49,13 +49,13 @@ curl --version
 
 ---
 
-## Run Unit Tests (66 tests, < 5 s)
+## Run Unit Tests (70 tests, < 5 s)
 
 ```bash
 mvn test
 ```
 
-Expected: `Tests run: 66, Failures: 0, Errors: 0, Skipped: 0 — BUILD SUCCESS`
+Expected: `Tests run: 70, Failures: 0, Errors: 0, Skipped: 0 — BUILD SUCCESS`
 
 No database or external services needed.
 

@@ -73,4 +73,32 @@ class MockEmailServiceImplTest {
         Files.deleteIfExists(nested);
         Files.deleteIfExists(nested.getParent());
     }
+
+    @Test
+    @DisplayName("sanitize CR/LF in email → log-forgery prevented")
+    void sendAgreementEmail_sanitizesCRLF() throws IOException {
+        emailService.sendAgreementEmail("alice@example.com\r\nEVIL=injected", "Bob\nSmith", 1L,
+            "http://u");
+
+        List<String> lines = Files.readAllLines(tempLogFile, StandardCharsets.UTF_8);
+        assertEquals(1, lines.size(), "CR/LF injection must not produce extra lines");
+
+        String line = lines.get(0);
+        assertTrue(line.contains("TO=alice@example.com\\r\\nEVIL=injected"),
+            "CRLF in email should be escaped, not interpreted");
+        assertTrue(line.contains("INVESTOR=Bob\\nSmith"),
+            "LF in name should be escaped, not interpreted");
+    }
+
+    @Test
+    @DisplayName("sanitize null email/name → writes 'null' safely")
+    void sendAgreementEmail_nullFields() throws IOException {
+        emailService.sendAgreementEmail(null, null, 1L, "http://u");
+
+        List<String> lines = Files.readAllLines(tempLogFile, StandardCharsets.UTF_8);
+        assertEquals(1, lines.size());
+        String line = lines.get(0);
+        assertTrue(line.contains("TO=null"));
+        assertTrue(line.contains("INVESTOR=null"));
+    }
 }

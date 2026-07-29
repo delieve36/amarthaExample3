@@ -151,4 +151,45 @@ class NotificationIntegrationTest {
         List<NotificationOutbox> exhausted = outboxRepository.findFailedForRetry(3);
         assertTrue(exhausted.stream().noneMatch(r -> r.getId().equals(outboxId)));
     }
+
+    @Test
+    @DisplayName("outbox status guard: markSent on already-SENT record returns 0")
+    void markSent_idempotentGuard() {
+        createTestInvestor(9003L, "test9003@example.com");
+        NotificationOutbox outbox = NotificationOutbox.createPending(
+            300L, 9003L, "test9003@example.com", "http://localhost:8080/api/loans/agreement/300");
+        outbox = outboxRepository.insert(outbox);
+
+        // First markSent → succeeds
+        outbox.markSent();
+        int rows1 = outboxRepository.markSent(outbox.getId(), outbox.getSentDatetime());
+        assertEquals(1, rows1, "First markSent should affect 1 row");
+
+        // Second markSent on already-SENT → rejected by status guard
+        outbox.markSent();
+        int rows2 = outboxRepository.markSent(outbox.getId(), outbox.getSentDatetime());
+        assertEquals(0, rows2, "Second markSent on SENT record must return 0 — status guard prevents overwrite");
+    }
+
+    @Test
+    @DisplayName("outbox status guard: markFailed on already-SENT record returns 0")
+    void markFailed_onSentReturnsZero() {
+        createTestInvestor(9004L, "test9004@example.com");
+        NotificationOutbox outbox = NotificationOutbox.createPending(
+            400L, 9004L, "test9004@example.com", "http://localhost:8080/api/loans/agreement/400");
+        outbox = outboxRepository.insert(outbox);
+
+        // Mark as SENT first
+        outbox.markSent();
+        outboxRepository.markSent(outbox.getId(), outbox.getSentDatetime());
+
+        // Try markFailed on SENT record → rejected
+        outbox.markFailed("should not happen");
+        int rows = outboxRepository.markFailed(outbox.getId(), outbox.getErrorMessage());
+        assertEquals(0, rows, "markFailed on SENT record must return 0");
+
+        // Verify status still SENT
+        List<NotificationOutbox> records = outboxRepository.findByLoanId(400L);
+        assertEquals(NotificationStatus.SENT, records.get(0).getStatus());
+    }
 }
