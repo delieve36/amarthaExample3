@@ -21,6 +21,10 @@ import java.util.List;
 @ToString
 public class ApproveLoanRequest {
 
+    @NotNull(message = "loanId is required")
+    @Positive(message = "loanId must be positive")
+    private Long loanId;
+
     @NotNull(message = "validatorEmployeeId is required")
     @Positive(message = "validatorEmployeeId must be positive")
     private Long validatorEmployeeId;

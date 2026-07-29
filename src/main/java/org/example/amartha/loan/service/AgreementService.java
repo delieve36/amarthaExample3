@@ -29,7 +29,7 @@ public class AgreementService {
      * {@link org.example.amartha.loan.controller.AgreementController}.</p>
      */
     public String generateAgreementUrl(Long loanId) {
-        return baseUrl + "/api/loans/" + loanId + "/agreement";
+        return baseUrl + "/api/loans/agreement/" + loanId;
     }
 
     /**

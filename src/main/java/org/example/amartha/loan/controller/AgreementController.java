@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Renders agreement letter HTML pages.
- * <p>{@code GET /api/loans/{id}/agreement} — open in browser to view.</p>
+ * <p>{@code GET /api/loans/agreement/{id}} — open in browser to view.</p>
  */
 @Slf4j
 @RestController
@@ -28,9 +28,9 @@ public class AgreementController {
         this.agreementService = agreementService;
     }
 
-    @GetMapping(value = "/{id}/agreement", produces = MediaType.TEXT_HTML_VALUE)
+    @GetMapping(value = "/agreement/{id}", produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> viewAgreement(@PathVariable Long id) {
-        log.info("GET /api/loans/{}/agreement", id);
+        log.info("GET /api/loans/agreement/{}", id);
         Loan loan = loanService.queryLoan(id);
         String html = agreementService.renderAgreement(loan);
         return ResponseEntity.ok(html);

@@ -13,7 +13,7 @@ import java.util.List;
 
 /**
  * Notification status query API.
- * <p>{@code GET /api/loans/{id}/notifications} — returns per-investor send status.</p>
+ * <p>{@code GET /api/loans/notifications/{id}} — returns per-investor send status.</p>
  */
 @Slf4j
 @RestController
@@ -26,9 +26,9 @@ public class NotificationController {
         this.outboxRepository = outboxRepository;
     }
 
-    @GetMapping("/{id}/notifications")
+    @GetMapping("/notifications/{id}")
     public ResponseEntity<List<NotificationResponse>> getNotifications(@PathVariable Long id) {
-        log.info("GET /api/loans/{}/notifications", id);
+        log.info("GET /api/loans/notifications/{}", id);
         var responses = outboxRepository.findByLoanId(id).stream()
             .map(NotificationResponse::from)
             .toList();
