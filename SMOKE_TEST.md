@@ -49,13 +49,13 @@ curl --version
 
 ---
 
-## Run Unit Tests (48 tests, < 5 s)
+## Run Unit Tests (66 tests, < 5 s)
 
 ```bash
 mvn test
 ```
 
-Expected: `Tests run: 48, Failures: 0, Errors: 0, Skipped: 0 — BUILD SUCCESS`
+Expected: `Tests run: 66, Failures: 0, Errors: 0, Skipped: 0 — BUILD SUCCESS`
 
 No database or external services needed.
 
@@ -378,6 +378,70 @@ curl -s -X POST $BASE/api/loans/investments \
 ```
 
 *Expected: `400 VALIDATION` — Jakarta `@Positive` constraint violation.*
+
+---
+## D. Bug Regression — Security & Data Integrity
+
+### D1. Duplicate investor_id → 409 CONFLICT (Bug #10)
+
+```bash
+# Alice (3001) is pre-loaded. Try creating again:
+curl -s -X POST $BASE/api/investors \
+  -H 'Content-Type: application/json' \
+  -d '{"investorId": 3001, "name": "Alice Duplicate", "emailUrl": "dupe@example.com", "registerDate": "2025-01-01"}' \
+  -w "\nHTTP %{http_code}\n"
+```
+
+*Expected: `HTTP 409`, `code: "DATA_CONFLICT"` — NOT 500.*
+
+### D2. Invest with fundStatus=RECEIVED → ignored, stays PENDING (Bug #9)
+
+```bash
+# Create a fresh loan for this test
+L3=$(curl -s -X POST $BASE/api/loans \
+  -H 'Content-Type: application/json' \
+  -d '{"borrowerId": 4001, "principalAmount": 3000, "interestRate": 5.0, "roi": 3.0, "currency": "USD"}' | jq -r .id)
+
+# Approve it
+curl -s -X PATCH $BASE/api/loans/approve \
+  -H 'Content-Type: application/json' \
+  -d "{\"loanId\": $L3, \"validatorEmployeeId\": 2001, \"approvalDatetime\": \"2026-07-28T00:00:00+08:00\", \"validatorPhotoUrls\": [\"http://x.jpg\"]}" > /dev/null
+
+# Try to invest with fundStatus=RECEIVED (attempting to bypass receiveFunds)
+curl -s -X POST $BASE/api/loans/investments \
+  -H 'Content-Type: application/json' \
+  -d "{\"loanId\": $L3, \"investorId\": 3001, \"investorName\": \"Alice\", \"amount\": 3000, \"currency\": \"USD\", \"fundStatus\": \"RECEIVED\", \"datetime\": \"2026-07-28T01:00:00+08:00\"}" | jq '.investments[0].fundStatus'
+```
+
+*Expected: `"PENDING"` — user-supplied `RECEIVED` is ignored; funds must be confirmed via `receiveFunds`.*
+
+### D3. receiveFunds with non-existent investmentId → 400 (Bug #8)
+
+```bash
+curl -s -X PATCH $BASE/api/loans/investments/receive \
+  -H 'Content-Type: application/json' \
+  -d "{\"loanId\": $L3, \"investmentId\": 99999}" \
+  -w "\nHTTP %{http_code}\n"
+```
+
+*Expected: `HTTP 400` — `"Investment not found or does not belong to loan"`.*
+
+### D4. receiveFunds with investment not belonging to loan → 400 (Bug #2)
+
+```bash
+# Get an investment from another loan (Loan 100 has investments from test data)
+INV_LOAN100=$(curl -s $BASE/api/loans/100 | jq -r '.investments[0].id // empty')
+if [ -n "$INV_LOAN100" ] && [ "$INV_LOAN100" != "null" ]; then
+  curl -s -X PATCH $BASE/api/loans/investments/receive \
+    -H 'Content-Type: application/json' \
+    -d "{\"loanId\": $L3, \"investmentId\": $INV_LOAN100}" \
+    -w "\nHTTP %{http_code}\n"
+else
+  echo "Skipped — Loan 100 has no investments yet. Run A4+A5 first."
+fi
+```
+
+*Expected: `HTTP 400` — `"Investment not found or does not belong to loan"` — cross-loan fund marking is rejected.*
 
 ---
 

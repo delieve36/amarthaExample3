@@ -355,18 +355,21 @@ See source: `org.example.amartha.loan.model.*`.
 
 ## Testing
 
-- **48 tests** — 43 pure JUnit 5 + 5 integration/unit (MockEmailServiceImpl, NotificationIntegration)
-- **8 test classes**:
+- **66 tests** — 57 pure JUnit 5 + 9 integration/unit (MockEmailServiceImpl, NotificationIntegration, LoanRepository)
+- **11 test classes**:
 
 | Class | Cases | What it covers |
 |-------|-------|----------------|
 | `LoanStateHandlerTest` | 29 | State transitions, validation (currency match, file type), edge cases |
 | `NotificationOutboxTest` | 4 | Entity state machine: createPending, markSent, markFailed, equality |
 | `AgreementServiceTest` | 2 | URL generation, Thymeleaf template delegation |
-| `LoanServiceTest` | 4 | investLoan orchestration: partial, fullyFunded → URL+event, notFound |
+| `LoanServiceTest` | 12 | investLoan orchestration: partial, fullyFunded → URL+event, notFound; **approveLoan:** forUpdate lock, notFound; **disburseLoan:** forUpdate lock, notFound; **receiveFunds:** allReceived, alreadySet, notFound, partial |
 | `InvestorNotificationListenerTest` | 4 | Event handling: each-investor email, skip-no-email, fail→markFailed, outbox fields |
 | `MockEmailServiceImplTest` | 3 | email.log write format, append, parent-dir creation |
 | `NotificationIntegrationTest` | 2 | End-to-end: investor → outbox → email.log → DB status; FAILED retry eligibility |
+| `LoanRepositoryTest` | 4 | **Integration:** saveDisbursement ID, updateInvestmentFundStatus rows/wrongLoan, investorSave ID |
+| `GlobalExceptionHandlerTest` | 4 | DataIntegrityViolationException→409, IllegalArgumentException→400, IllegalStateException→409, Exception→500 |
+| `LoanControllerTest` | 2 | invest fundStatus forced PENDING (user RECEIVED ignored + null default) |
 
 - Run: `mvn test`
 
