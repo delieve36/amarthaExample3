@@ -50,6 +50,13 @@ public final class ApprovedState extends AbstractLoanState {
                 ", principal: " + loan.getPrincipalAmount());
         }
 
+        if (investment.getDatetime() != null
+                && investment.getDatetime().isAfter(java.time.OffsetDateTime.now())) {
+            log.warn("FUTURE INVESTMENT — investor={} loan={} amount={} scheduled={}",
+                    investment.getInvestorId(), loan.getId(),
+                    investment.getAmount(), investment.getDatetime());
+        }
+
         investment.setLoanId(loan.getId());
         loan.getInvestments().add(investment);
 
