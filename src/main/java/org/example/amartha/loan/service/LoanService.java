@@ -128,13 +128,7 @@ public class LoanService {
 
     @Transactional
     public void receiveFunds(Long loanId, Long investmentId) {
-        int rows = loanRepository.updateInvestmentFundStatus(investmentId, loanId, FundStatus.RECEIVED);
-        if (rows == 0) {
-            throw new IllegalArgumentException(
-                "Investment not found or does not belong to loan: investmentId=" + investmentId + " loanId=" + loanId);
-        }
-        log.info("Investment {} funds marked as RECEIVED", investmentId);
-
+        // ① 先锁 loans 行 — 和其他方法统一锁顺序，避免死锁
         Loan loan = loanRepository.findByIdForUpdate(loanId)
             .orElseThrow(() -> new IllegalArgumentException("Loan not found: " + loanId));
 
@@ -144,7 +138,16 @@ public class LoanService {
             return;
         }
 
-        boolean allReceived = loan.getInvestments().stream()
+        // ② 更新 investment 资金状态
+        int rows = loanRepository.updateInvestmentFundStatus(investmentId, loanId, FundStatus.RECEIVED);
+        if (rows == 0) {
+            throw new IllegalArgumentException(
+                "Investment not found or does not belong to loan: investmentId=" + investmentId + " loanId=" + loanId);
+        }
+        log.info("Investment {} funds marked as RECEIVED", investmentId);
+
+        // ③ 重新加载 investments（此时当前 investment 状态已更新），检查是否全部到账
+        boolean allReceived = loanRepository.findInvestmentsByLoanId(loanId).stream()
             .allMatch(inv -> inv.getFundStatus() == FundStatus.RECEIVED);
         if (allReceived) {
             loan.setFundsReceivedDatetime(java.time.OffsetDateTime.now());
