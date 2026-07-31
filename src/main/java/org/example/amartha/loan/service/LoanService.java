@@ -19,7 +19,6 @@ import java.time.OffsetDateTime;
  */
 @Slf4j
 @Service
-@Transactional
 public class LoanService {
 
     private final LoanRepository loanRepository;
@@ -37,7 +36,7 @@ public class LoanService {
     // ========================================================================
     // Lifecycle
     // ========================================================================
-
+    @Transactional
     public Loan createLoan(Long borrowerId, String borrowerName, BigDecimal principalAmount,
                            BigDecimal interestRate, BigDecimal roi, String currency) {
         Loan loan = new Loan(borrowerId, principalAmount, interestRate, roi, currency);
@@ -59,6 +58,7 @@ public class LoanService {
     // State transitions
     // ========================================================================
 
+    @Transactional
     public Loan approveLoan(Long loanId, Approval approval) {
         Loan loan = loanRepository.findByIdForUpdate(loanId)
             .orElseThrow(() -> new IllegalArgumentException("Loan not found: " + loanId));
@@ -73,6 +73,7 @@ public class LoanService {
         return loan;
     }
 
+    @Transactional
     public Loan investLoan(Long loanId, Investment investment) {
         Loan loan = loanRepository.findByIdForUpdate(loanId)
             .orElseThrow(() -> new IllegalArgumentException("Loan not found: " + loanId));
@@ -110,6 +111,7 @@ public class LoanService {
         return loan;
     }
 
+    @Transactional
     public Loan disburseLoan(Long loanId, Disbursement disbursement) {
         Loan loan = loanRepository.findByIdForUpdate(loanId)
             .orElseThrow(() -> new IllegalArgumentException("Loan not found: " + loanId));
